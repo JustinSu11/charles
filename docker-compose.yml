@@ -10,6 +10,9 @@ services:
       - WEBUI_AUTH=true
       - ENABLE_OLLAMA_API=false
       - WEBUI_NAME=Charles
+      - OPENROUTER_API_URL=https://openrouter.ai/api/v1
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - DEFAULT_MODELS=meta-llama/llama-3.3-70b-instruct:free
     restart: unless-stopped
 
 volumes:
