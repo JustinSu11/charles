@@ -19,6 +19,27 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+
+  charles-api:
+    build: 
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: charles-api
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://charles:charles@postgres:5432/charles
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+    depends_on:
+      postgres:
+        condition: service_healthy # waits for postgres to pass its healthcheck
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
   open-webui:
     image: ghcr.io/open-webui/open-webui:main
     container_name: charles-webui
@@ -33,6 +54,9 @@ services:
       - OPENROUTER_API_URL=https://openrouter.ai/api/v1
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
       - DEFAULT_MODELS=meta-llama/llama-3.3-70b-instruct:free
+    depends_on:
+      charles-api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:
