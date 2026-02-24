@@ -16,10 +16,10 @@
 
 ### PostgreSQL
 
-- [ ] Design database schema: `conversations` table (id, interface, timestamp) and `messages` table (id, conversation_id, role, content, timestamp)
-- [ ] Write initialization SQL script that runs on first container start
-- [ ] Add PostgreSQL service to `docker-compose.yml` with named volume
-- [ ] Verify data persists across `docker-compose down` / `up` cycles
+- [x] Design database schema: `conversations` table (id, interface, timestamp) and `messages` table (id, conversation_id, role, content, timestamp)
+- [x] Write initialization SQL script that runs on first container start
+- [x] Add PostgreSQL service to `docker-compose.yml` with named volume
+- [x] Verify data persists across `docker-compose down` / `up` cycles
 
 ### Charles API Service
 
