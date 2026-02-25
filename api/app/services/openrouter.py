@@ -6,7 +6,7 @@ load_dotenv()
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-MODEL = "meta-llama/Llama-3.3-70b-instruct:free"
+MODEL = os.getenv("OPENROUTER_MODEL", "qwen/qwen3-next-80b-a3b-instruct:free")
 
 SYSTEM_PROMPT = (
     "You are Charles, a helpful AI assistant. "

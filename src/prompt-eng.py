@@ -36,7 +36,7 @@ if not API_KEY:
 # model = ChatOpenAI(
 #     base_url="https://openrouter.ai/api/v1",
 #     api_key=API_KEY,
-#     model="meta-llama/llama-3.3-70b-instruct:free"
+#     model="qwen/qwen3-next-80b-a3b-instruct:free"
 # )
 
 # model = ChatOpenAI(

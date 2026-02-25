@@ -53,7 +53,7 @@ services:
       - WEBUI_NAME=Charles
       - OPENROUTER_API_URL=https://openrouter.ai/api/v1
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
-      - DEFAULT_MODELS=meta-llama/llama-3.3-70b-instruct:free
+      - DEFAULT_MODELS=qwen/qwen3-next-80b-a3b-instruct:free
     depends_on:
       charles-api:
         condition: service_healthy

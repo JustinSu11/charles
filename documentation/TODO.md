@@ -23,15 +23,15 @@
 
 ### Charles API Service
 
-- [ ] Set up FastAPI project in `/api` with health check endpoint (`GET /health`)
-- [ ] Implement OpenRouter client (`meta-llama/llama-3.3-70b-instruct:free`) with API key from env
-- [ ] Implement `POST /chat` endpoint (message + conversation ID → OpenRouter → store in PostgreSQL → return response)
-- [ ] Implement `GET /history/{conversation_id}` endpoint
-- [ ] Implement `DELETE /history/{conversation_id}` endpoint
-- [ ] Add CORS config (allow Open WebUI on localhost:3000 and voice service)
-- [ ] Add error handling for OpenRouter failures (rate limits, timeouts)
-- [ ] Write Dockerfile for the API service (`python:3.11-slim`)
-- [ ] Add Charles API service to `docker-compose.yml`
+- [x] Set up FastAPI project in `/api` with health check endpoint (`GET /health`)
+- [x] Implement OpenRouter client (`qwen/qwen3-next-80b-a3b-instruct:free`) with API key from env
+- [x] Implement `POST /chat` endpoint (message + conversation ID → OpenRouter → store in PostgreSQL → return response)
+- [x] Implement `GET /history/{conversation_id}` endpoint
+- [x] Implement `DELETE /history/{conversation_id}` endpoint
+- [x] Add CORS config (allow Open WebUI on localhost:3000 and voice service)
+- [x] Add error handling for OpenRouter failures (rate limits, timeouts)
+- [x] Write Dockerfile for the API service (`python:3.11-slim`)
+- [x] Add Charles API service to `docker-compose.yml`
 
 ### Open WebUI
 

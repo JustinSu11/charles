@@ -66,7 +66,12 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     except httpx.HTTPStatusError as e:
         status = e.response.status_code
         if status == 429:
-            raise HTTPException(status_code=429, detail="OpenRouter rate limit reached. Try again shortly.")
+            try:
+                upstream = e.response.json()
+                msg = upstream.get("error", {}).get("metadata", {}).get("raw", "Rate limit reached.")
+            except Exception:
+                msg = "Rate limit reached."
+            raise HTTPException(status_code=429, detail=f"OpenRouter rate limit: {msg}")
         if status == 401:
             raise HTTPException(status_code=500, detail="OpenRouter API key is invalid.")
         raise HTTPException(status_code=502, detail=f"OpenRouter error: {status}")
