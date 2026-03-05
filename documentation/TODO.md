@@ -37,7 +37,7 @@
 
 - [x] Configure Open WebUI container to point to Charles API as its backend
 - [ ] Verify chat history is shared between voice and web interfaces
-- [ ] Confirm web interface is accessible at `localhost:3000` after `docker-compose up`
+- [x] Confirm web interface is accessible at `localhost:3000` after `docker-compose up`
 
 ## Phase 2 — MCP Server Integration
 
