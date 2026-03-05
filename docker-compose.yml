@@ -55,7 +55,7 @@ services:
       # Route all LLM traffic through Charles API (OpenAI-compatible proxy)
       - OPENAI_API_BASE_URLS=http://charles-api:8000/v1
       - OPENAI_API_KEYS=sk-charles-local
-      - DEFAULT_MODELS=qwen/qwen3-next-80b-a3b-instruct:free
+      - DEFAULT_MODELS=meta-llama/llama-3.3-70b-instruct:free
     depends_on:
       charles-api:
         condition: service_healthy
