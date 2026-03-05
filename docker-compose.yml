@@ -50,9 +50,11 @@ services:
     environment:
       - WEBUI_AUTH=true
       - ENABLE_OLLAMA_API=false
+      - ENABLE_OPENAI_API=true
       - WEBUI_NAME=Charles
-      - OPENROUTER_API_URL=https://openrouter.ai/api/v1
-      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      # Route all LLM traffic through Charles API (OpenAI-compatible proxy)
+      - OPENAI_API_BASE_URLS=http://charles-api:8000/v1
+      - OPENAI_API_KEYS=sk-charles-local
       - DEFAULT_MODELS=qwen/qwen3-next-80b-a3b-instruct:free
     depends_on:
       charles-api:

@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import ping_db
-from app.routers import chat, history
+from app.routers import chat, history, openai_compat
 
 app = FastAPI(
     title = "Charles API",
@@ -29,6 +29,7 @@ app.add_middleware(
 # Routers
 app.include_router(chat.router)
 app.include_router(history.router)
+app.include_router(openai_compat.router)
 
 # Health check
 @app.get("/health")
