@@ -50,15 +50,15 @@
 
 ## Phase 3 — Voice Service
 
-- [ ] Generate custom "Hey Charles" wake word model (`.ppn`) via Picovoice Console
-- [ ] Integrate `pvporcupine` with always-on microphone loop
-- [ ] Integrate `openai-whisper` — benchmark base/small/medium, auto-download on first run
-- [ ] Implement audio capture buffer + silence detection
-- [ ] Integrate `piper-tts` — select English voice, implement TTS playback pipeline
-- [ ] Implement speech interruption (wake word during playback stops and listens)
-- [ ] Implement HTTP client to send transcribed text to `POST /chat`
+- [ ] Generate custom "Hey Charles" wake word model (`.ppn`) via Picovoice Console _(manual: console.picovoice.ai → place at `voice/models/hey-charles.ppn`)_
+- [x] Integrate `pvporcupine` with always-on microphone loop (`wake_word.py` — `run_forever()` + `wait_for_wake_word()`; falls back to built-in keyword if `.ppn` missing)
+- [x] Integrate `openai-whisper` — benchmark base/small/medium, auto-download on first run (`stt.py` — model selectable via `WHISPER_MODEL` in `.env`)
+- [x] Implement audio capture buffer + silence detection (`audio.py` — RMS energy gate, configurable threshold + duration)
+- [x] Integrate `piper-tts` — select English voice, implement TTS playback pipeline (`tts.py` — binary + model auto-download, `en_US-lessac-medium` default)
+- [x] Implement speech interruption (wake word during playback stops and listens) (`tts.stop_speaking()` called from `_on_wake()` in `main.py`)
+- [x] Implement HTTP client to send transcribed text to `POST /chat` (`api_client.py` — persists `conversation_id` across turns, graceful error handling)
 - [ ] Test full audio pipeline on Windows (WASAPI), macOS (CoreAudio), Linux (ALSA)
-- [ ] Implement audio device enumeration for users with multiple mics/speakers
+- [x] Implement audio device enumeration for users with multiple mics/speakers (`audio.py` — `list_input_devices()`, `list_output_devices()`; `--list-devices` CLI flag in `main.py`)
 
 ## Phase 4 — GUI Launcher
 
