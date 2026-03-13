@@ -148,6 +148,7 @@ vite.config.ts.timestamp-*
 
 # Claude Code project context (personal notes, not for git)
 CLAUDE.md
+.claude/
 
 # ── Python ────────────────────────────────────────────────────────────────────
 __pycache__/

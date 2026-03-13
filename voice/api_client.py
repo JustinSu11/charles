@@ -106,7 +106,7 @@ def send_message(text: str) -> str:
         return msg
 
     data: dict = response.json()
-    reply: str = data.get("reply", "")
+    reply: str = data.get("response", "")
     new_conv_id: Optional[str] = data.get("conversation_id")
 
     if new_conv_id and _conversation_id is None:

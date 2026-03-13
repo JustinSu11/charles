@@ -1,9 +1,9 @@
 """
 OpenAI-compatible API endpoints (/v1/models, /v1/chat/completions).
 
-Allows Open WebUI to use Charles API as its LLM backend.
-Charles proxies requests to OpenRouter, injecting the system prompt
-and (in the future) storing conversation data in PostgreSQL.
+Allows Open WebUI to use Charles API as its LLM backend.  Charles proxies
+requests to OpenRouter but uses PostgreSQL as the single source of truth for
+conversation history so voice and web turns are always combined.
 """
 
 import json
@@ -11,10 +11,17 @@ import time
 import uuid
 import httpx
 import logging
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Depends, Request, HTTPException
 from fastapi.responses import JSONResponse, StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database import get_db, AsyncSessionLocal
 from app.services.openrouter import OPENROUTER_API_KEY, MODEL, SYSTEM_PROMPT
+from app.services.conversation import (
+    get_or_create_shared_conversation,
+    fetch_history,
+    store_message,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -97,12 +104,15 @@ async def list_models():
 
 
 @router.post("/chat/completions")
-async def chat_completions(request: Request):
+async def chat_completions(request: Request, db: AsyncSession = Depends(get_db)):
     """
     OpenAI-compatible chat completions endpoint.
 
     Open WebUI  →  Charles API (/v1/chat/completions)  →  OpenRouter
-                                                        →  (stores in PG, future)
+
+    Uses PostgreSQL as the source of truth for history so voice and web
+    conversations are always combined.  The messages sent by Open WebUI are
+    used only to extract the latest user turn; everything else comes from DB.
 
     Supports both streaming (SSE) and non-streaming responses.
     """
@@ -110,19 +120,35 @@ async def chat_completions(request: Request):
         raise HTTPException(status_code=500, detail="OPENROUTER_API_KEY not configured")
 
     body = await request.json()
-    messages = body.get("messages", [])
+    incoming_messages = body.get("messages", [])
     stream = body.get("stream", False)
 
-    # Inject Charles system prompt when the caller hasn't provided one
-    if not messages or messages[0].get("role") != "system":
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}] + messages
+    # Extract the last user message from what Open WebUI sent
+    last_user_msg = next(
+        (m["content"] for m in reversed(incoming_messages) if m.get("role") == "user"),
+        None,
+    )
+
+    # Get shared conversation and fetch its full history from PostgreSQL
+    conversation_id = await get_or_create_shared_conversation(db)
+    pg_history = await fetch_history(db, conversation_id)
+
+    # Store the new user message in PostgreSQL before calling OpenRouter
+    if last_user_msg:
+        await store_message(db, conversation_id, "user", last_user_msg)
+        await db.commit()
+
+    # Build the messages to send to OpenRouter:
+    # [system prompt] + [full PG history including voice turns] + [new user message]
+    final_messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    final_messages.extend(pg_history)
+    if last_user_msg:
+        final_messages.append({"role": "user", "content": last_user_msg})
 
     headers = _openrouter_headers()
-
-    # Build the payload – forward the most commonly used parameters
     payload = {
         "model": body.get("model", MODEL),
-        "messages": messages,
+        "messages": final_messages,
         "stream": stream,
     }
     for key in ("temperature", "max_tokens", "top_p",
@@ -132,11 +158,11 @@ async def chat_completions(request: Request):
 
     if stream:
         return StreamingResponse(
-            _stream_response(headers, payload),
+            _stream_response(headers, payload, conversation_id),
             media_type="text/event-stream",
             headers={
                 "Cache-Control": "no-cache",
-                "X-Accel-Buffering": "no",  # prevents Nginx from buffering SSE
+                "X-Accel-Buffering": "no",
             },
         )
 
@@ -151,8 +177,6 @@ async def chat_completions(request: Request):
 
         data = resp.json()
 
-        # OpenRouter returns errors with an "error" key — translate to
-        # a proper OpenAI-shaped error so Open WebUI understands it.
         if resp.status_code != 200 or "error" in data:
             error_info = data.get("error", {})
             msg = error_info.get("message", "Unknown upstream error")
@@ -169,6 +193,12 @@ async def chat_completions(request: Request):
                 },
             )
 
+        # Store the assistant reply in PostgreSQL
+        assistant_reply = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+        if assistant_reply:
+            await store_message(db, conversation_id, "assistant", assistant_reply)
+            await db.commit()
+
         return JSONResponse(content=data)
 
     except httpx.TimeoutException:
@@ -181,16 +211,16 @@ async def chat_completions(request: Request):
 # ── Streaming helper ──────────────────────────────────────────────────────
 
 
-async def _stream_response(headers: dict, payload: dict):
+async def _stream_response(headers: dict, payload: dict, conversation_id: str):
     """
-    Open a streaming connection to OpenRouter and forward each SSE
-    chunk back to the caller (Open WebUI) verbatim.
+    Open a streaming connection to OpenRouter, forward each SSE chunk to the
+    caller, and store the complete assistant reply in PostgreSQL when done.
 
-    If OpenRouter returns a non-2xx status (e.g. 429 rate limit),
-    emit a single SSE error chunk so Open WebUI displays the error
-    gracefully instead of failing with a cryptic "user not found".
+    Uses a fresh DB session (not the request-scoped Depends session) because
+    the generator runs after the endpoint function has already returned.
     """
     model = payload.get("model", "unknown")
+    collected_text: list[str] = []
 
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -225,14 +255,38 @@ async def _stream_response(headers: dict, payload: dict):
 
                 # ── Normal streaming path ─────────────────────────────
                 async for line in resp.aiter_lines():
-                    if line.strip():
-                        yield f"{line}\n\n"
+                    if not line.strip():
+                        continue
+                    yield f"{line}\n\n"
+
+                    # Collect delta text so we can store it in PostgreSQL
+                    if line.startswith("data: ") and line != "data: [DONE]":
+                        try:
+                            chunk = json.loads(line[6:])
+                            delta = chunk["choices"][0]["delta"].get("content", "")
+                            if delta:
+                                collected_text.append(delta)
+                        except (json.JSONDecodeError, KeyError, IndexError):
+                            pass
 
     except httpx.TimeoutException:
         logger.error("OpenRouter stream timed out")
         yield _error_as_sse("OpenRouter timed out. Please try again.", model=model)
+        return
     except httpx.RequestError as exc:
         logger.error("OpenRouter stream connection error: %s", exc)
         yield _error_as_sse(
             "Could not connect to OpenRouter. Please try again.", model=model
         )
+        return
+
+    # Store the complete assistant reply in PostgreSQL after streaming finishes
+    if collected_text and conversation_id:
+        assistant_reply = "".join(collected_text)
+        try:
+            async with AsyncSessionLocal() as db:
+                await store_message(db, conversation_id, "assistant", assistant_reply)
+                await db.commit()
+            logger.debug("Stored streamed assistant reply (%d chars)", len(assistant_reply))
+        except Exception as exc:
+            logger.error("Failed to store streamed assistant reply: %s", exc)

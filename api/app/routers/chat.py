@@ -7,6 +7,7 @@ import uuid
 from app.database import get_db
 from app.models import ChatRequest, ChatResponse
 from app.services.openrouter import get_openrouter_response
+from app.services.conversation import get_or_create_shared_conversation
 
 router = APIRouter()
 
@@ -14,17 +15,14 @@ router = APIRouter()
 async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     """
     Send a message to Charles.
-    - Creates a new conversation if conversation_id is not provided.
+    - Uses the shared conversation when no conversation_id is provided so voice
+      and web history are always combined in PostgreSQL.
     - Fetches full history, calls OpenRouter, stores both messages, returns reply.
     """
 
-    # 1. Resolve or create conversation
+    # 1. Resolve conversation — default to the shared session
     if request.conversation_id is None:
-        result = await db.execute(
-            text("INSERT INTO conversations (interface) VALUES (:interface) RETURNING id"), {"interface": request.interface},
-        )
-        await db.commit()
-        conversation_id = result.scalar_one()
+        conversation_id = await get_or_create_shared_conversation(db)
     else:
         result = await db.execute(
             text("SELECT id FROM conversations WHERE id = :id"), {"id": str(request.conversation_id)},

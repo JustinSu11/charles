@@ -36,3 +36,9 @@ trg_update_conversation_timestamp
 AFTER INSERT ON messages
 FOR EACH ROW EXECUTE FUNCTION
 update_conversation_timestamp();
+
+-- Key/value store for persistent API state (e.g. shared conversation ID)
+CREATE TABLE IF NOT EXISTS app_state (
+    key   VARCHAR(100) PRIMARY KEY,
+    value TEXT NOT NULL
+);

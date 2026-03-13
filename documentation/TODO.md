@@ -50,7 +50,7 @@
 
 ## Phase 3 — Voice Service
 
-- [ ] Generate custom "Hey Charles" wake word model (`.ppn`) via Picovoice Console _(manual: console.picovoice.ai → place at `voice/models/hey-charles.ppn`)_
+- [x] Generate custom "Hey Charles" wake word model (`.ppn`) via Picovoice Console _(manual: console.picovoice.ai → place at `voice/models/hey-charles.ppn`)_
 - [x] Integrate `pvporcupine` with always-on microphone loop (`wake_word.py` — `run_forever()` + `wait_for_wake_word()`; falls back to built-in keyword if `.ppn` missing)
 - [x] Integrate `openai-whisper` — benchmark base/small/medium, auto-download on first run (`stt.py` — model selectable via `WHISPER_MODEL` in `.env`)
 - [x] Implement audio capture buffer + silence detection (`audio.py` — RMS energy gate, configurable threshold + duration)
