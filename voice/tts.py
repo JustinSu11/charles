@@ -50,7 +50,9 @@ PIPER_RATE: float = float(os.getenv("PIPER_RATE", "1.0"))
 
 # Piper binary name per platform
 _PIPER_BINARY: str = "piper.exe" if platform.system() == "Windows" else "piper"
-PIPER_BIN: Path = _BIN_DIR / _PIPER_BINARY
+# The piper release zip extracts into a 'piper/' subdirectory inside _BIN_DIR
+# e.g.  voice/bin/piper/piper.exe  (not  voice/bin/piper.exe)
+PIPER_BIN: Path = _BIN_DIR / "piper" / _PIPER_BINARY
 
 # Hugging Face base URL for model downloads
 _HF_BASE = "https://huggingface.co/rhasspy/piper-voices/resolve/main"
