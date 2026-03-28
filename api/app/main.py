@@ -90,5 +90,6 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/health")
 async def health():
+    """API liveness + DB reachability. Used by the Electron launcher's health poll."""
     db_status = await ping_db()
     return {"status": "ok", "database": "reachable" if db_status else "unreachable"}
