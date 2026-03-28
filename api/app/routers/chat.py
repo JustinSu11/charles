@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
@@ -14,53 +15,43 @@ router = APIRouter()
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
-    """
-    Send a message to Charles.
-    - Uses the shared conversation when no conversation_id is provided so voice
-      and web history are always combined in PostgreSQL.
-    - Fetches full history, calls OpenRouter, stores both messages, returns reply.
-    - Broadcasts the completed turn to all connected WebSocket clients.
-    """
-
-    # 1. Resolve conversation — default to the shared session
+    # 1. Resolve conversation
     if request.conversation_id is None:
         conversation_id = await get_or_create_shared_conversation(db)
     else:
         result = await db.execute(
-            text("SELECT id FROM conversations WHERE id = :id"), {"id": str(request.conversation_id)},
+            text("SELECT id FROM conversations WHERE id = :id"),
+            {"id": str(request.conversation_id)},
         )
         row = result.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="conversation_id not found")
         conversation_id = row[0]
 
-    # 2. Fetch existing history for context
+    # 2. Fetch history for context
     history_result = await db.execute(
         text("""
             SELECT role, content FROM messages
             WHERE conversation_id = :cid
             ORDER BY created_at ASC
         """),
-        {"cid": str(conversation_id)}
+        {"cid": str(conversation_id)},
     )
-    history = [{"role": row[0], "content": row[1]} for row in history_result.fetchall()]
-
-    # 3. Append the new user message to history
+    history = [{"role": r[0], "content": r[1]} for r in history_result.fetchall()]
     history.append({"role": "user", "content": request.message})
 
-    # 4. Store user message in DB
-    user_msg_result = await db.execute(
+    # 3. Store user message (UUID generated in Python)
+    user_message_id = str(uuid.uuid4())
+    await db.execute(
         text("""
-            INSERT INTO messages (conversation_id, role, content)
-            VALUES (:cid, 'user', :content)
-            RETURNING id
+            INSERT INTO messages (id, conversation_id, role, content)
+            VALUES (:id, :cid, 'user', :content)
         """),
-        {"cid": str(conversation_id), "content": request.message}
+        {"id": user_message_id, "cid": str(conversation_id), "content": request.message},
     )
     await db.commit()
-    user_message_id = user_msg_result.scalar_one()
 
-    # 5. Call OpenRouter
+    # 4. Call OpenRouter
     try:
         assistant_reply = await get_openrouter_response(history)
     except httpx.HTTPStatusError as e:
@@ -78,21 +69,18 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="OpenRouter timed out. Try again.")
 
-    # 6. Store assistant's reply in DB
-    assistant_msg_result = await db.execute(
+    # 5. Store assistant reply
+    assistant_message_id = str(uuid.uuid4())
+    await db.execute(
         text("""
-            INSERT INTO messages (conversation_id, role, content)
-            VALUES (:cid, 'assistant', :content)
-            RETURNING id
+            INSERT INTO messages (id, conversation_id, role, content)
+            VALUES (:id, :cid, 'assistant', :content)
         """),
-        {"cid": str(conversation_id), "content": assistant_reply}
+        {"id": assistant_message_id, "cid": str(conversation_id), "content": assistant_reply},
     )
     await db.commit()
-    assistant_message_id = assistant_msg_result.scalar_one()
 
-    # 7. Broadcast the completed turn to all connected browser clients.
-    #    Both user and assistant messages are sent together so the UI can
-    #    render them as a pair and knows the LLM has already responded.
+    # 6. Broadcast to all connected WebSocket clients
     await manager.broadcast({
         "type": "turn",
         "interface": request.interface,
@@ -100,12 +88,12 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
         "user": {
             "role": "user",
             "content": request.message,
-            "message_id": str(user_message_id),
+            "message_id": user_message_id,
         },
         "assistant": {
             "role": "assistant",
             "content": assistant_reply,
-            "message_id": str(assistant_message_id),
+            "message_id": assistant_message_id,
         },
     })
 
