@@ -1,12 +1,29 @@
+"""
+database.py — SQLite async engine and session factory.
+
+DB file lives at ~/.charles/charles.db by default.
+Override with DATABASE_URL or CHARLES_DATA_DIR env vars.
+"""
+
+import os
+import pathlib
+
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy import text
 from dotenv import load_dotenv
-import os
 
 load_dotenv()
 
-#asyncpg driver for async SQLAlchemy
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://charles:charles@postgres:5432/charles")
+# Resolve DB file path
+_data_dir = pathlib.Path(
+    os.environ.get("CHARLES_DATA_DIR", pathlib.Path.home() / ".charles")
+)
+_data_dir.mkdir(parents=True, exist_ok=True)
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL",
+    f"sqlite+aiosqlite:///{_data_dir / 'charles.db'}"
+)
 
 engine = create_async_engine(DATABASE_URL, echo=False)
 
@@ -16,13 +33,15 @@ AsyncSessionLocal = async_sessionmaker(
     expire_on_commit=False,
 )
 
-# FastAPI dependency — yields a DB session, closes it after the request.
+
 async def get_db() -> AsyncSession:
+    """FastAPI dependency — yields a DB session, closes it after the request."""
     async with AsyncSessionLocal() as session:
         yield session
 
-# Health check — returns True if PostgreSQL is reachable.
-async def ping_db():
+
+async def ping_db() -> bool:
+    """Returns True if the database is reachable."""
     try:
         async with engine.connect() as conn:
             await conn.execute(text("SELECT 1"))
