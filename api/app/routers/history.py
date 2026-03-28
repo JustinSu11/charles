@@ -33,7 +33,7 @@ async def get_shared_history(db: AsyncSession = Depends(get_db)):
             id=r[0],
             role=r[1],
             content=r[2],
-            created_at=datetime.fromisoformat(str(r[3])),
+            created_at=datetime.fromisoformat(str(r[3]).replace(" ", "T")),
         )
         for r in msg_result.fetchall()
     ]
@@ -63,7 +63,7 @@ async def get_history(conversation_id: str, db: AsyncSession = Depends(get_db)):
             id=row[0],
             role=row[1],
             content=row[2],
-            created_at=datetime.fromisoformat(str(row[3])),
+            created_at=datetime.fromisoformat(str(row[3]).replace(" ", "T")),
         )
         for row in msg_result.fetchall()
     ]
