@@ -86,6 +86,7 @@ def handle_wake(
     ack = _ack_phrase()
     logger.info("Wake word detected — acknowledging: %r", ack)
     tts.speak(ack, output_device_index=output_device_index)
+    print("VOICE_STATE:LISTENING", flush=True)
 
     # 2. Record until silence
     logger.info("Waiting for user to speak…")
@@ -98,6 +99,7 @@ def handle_wake(
         return
 
     # 3. Transcribe
+    print("VOICE_STATE:TRANSCRIBING", flush=True)
     text = stt.transcribe(audio_data)
 
     if not text:
@@ -119,6 +121,7 @@ def handle_wake(
 
     # 6. Speak reply (interruptible via wake word — stop_speaking() is called
     #    by the wake word thread if the user says "Hey Charles" mid-reply)
+    print("VOICE_STATE:SPEAKING", flush=True)
     tts.speak(reply, output_device_index=output_device_index)
 
 
