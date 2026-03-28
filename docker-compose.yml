@@ -40,27 +40,5 @@ services:
       retries: 5
       start_period: 15s
     restart: unless-stopped
-  open-webui:
-    image: ghcr.io/open-webui/open-webui:main
-    container_name: charles-webui
-    ports:
-      - "3000:8080"
-    volumes:
-      - open-webui-data:/app/backend/data
-    environment:
-      - WEBUI_AUTH=true
-      - ENABLE_OLLAMA_API=false
-      - ENABLE_OPENAI_API=true
-      - WEBUI_NAME=Charles
-      # Route all LLM traffic through Charles API (OpenAI-compatible proxy)
-      - OPENAI_API_BASE_URLS=http://charles-api:8000/v1
-      - OPENAI_API_KEYS=sk-charles-local
-      - DEFAULT_MODELS=meta-llama/llama-3.3-70b-instruct:free
-    depends_on:
-      charles-api:
-        condition: service_healthy
-    restart: unless-stopped
-
 volumes:
-  open-webui-data:
   postgres-data:

@@ -7,6 +7,37 @@ from app.models import HistoryResponse, MessageOut
 
 router = APIRouter()
 
+
+@router.get("/history/shared", response_model=HistoryResponse)
+async def get_shared_history(db: AsyncSession = Depends(get_db)):
+    """
+    Return full history for the shared conversation (voice + web combined).
+    Returns an empty message list if the shared conversation hasn't been created yet.
+    Used by the web UI on page load.
+    """
+    result = await db.execute(
+        text("SELECT value FROM app_state WHERE key = 'shared_conversation_id'")
+    )
+    row = result.fetchone()
+    if not row:
+        # No conversation yet — UI should show empty state
+        raise HTTPException(status_code=404, detail="No shared conversation yet")
+
+    conversation_id = row[0]
+    msg_result = await db.execute(
+        text("""
+            SELECT id, role, content, created_at FROM messages
+            WHERE conversation_id = :cid
+            ORDER BY created_at ASC
+        """),
+        {"cid": conversation_id},
+    )
+    messages = [
+        MessageOut(id=r[0], role=r[1], content=r[2], created_at=r[3])
+        for r in msg_result.fetchall()
+    ]
+    return HistoryResponse(conversation_id=conversation_id, interface="voice", messages=messages)
+
 @router.get("/history/{conversation_id}", response_model = HistoryResponse)
 async def get_history(conversation_id: str, db: AsyncSession = Depends(get_db)):
     # return full message history for a conversation

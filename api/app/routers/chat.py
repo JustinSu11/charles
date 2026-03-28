@@ -2,14 +2,15 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 import httpx
-import uuid
 
 from app.database import get_db
 from app.models import ChatRequest, ChatResponse
 from app.services.openrouter import get_openrouter_response
 from app.services.conversation import get_or_create_shared_conversation
+from app.services.ws_manager import manager
 
 router = APIRouter()
+
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
@@ -18,6 +19,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     - Uses the shared conversation when no conversation_id is provided so voice
       and web history are always combined in PostgreSQL.
     - Fetches full history, calls OpenRouter, stores both messages, returns reply.
+    - Broadcasts the completed turn to all connected WebSocket clients.
     """
 
     # 1. Resolve conversation — default to the shared session
@@ -46,7 +48,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     # 3. Append the new user message to history
     history.append({"role": "user", "content": request.message})
 
-    # 4 Store user message in DB
+    # 4. Store user message in DB
     user_msg_result = await db.execute(
         text("""
             INSERT INTO messages (conversation_id, role, content)
@@ -88,8 +90,27 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     await db.commit()
     assistant_message_id = assistant_msg_result.scalar_one()
 
+    # 7. Broadcast the completed turn to all connected browser clients.
+    #    Both user and assistant messages are sent together so the UI can
+    #    render them as a pair and knows the LLM has already responded.
+    await manager.broadcast({
+        "type": "turn",
+        "interface": request.interface,
+        "conversation_id": str(conversation_id),
+        "user": {
+            "role": "user",
+            "content": request.message,
+            "message_id": str(user_message_id),
+        },
+        "assistant": {
+            "role": "assistant",
+            "content": assistant_reply,
+            "message_id": str(assistant_message_id),
+        },
+    })
+
     return ChatResponse(
-        conversation_id = conversation_id,
-        message_id = assistant_message_id,
-        response = assistant_reply,
+        conversation_id=conversation_id,
+        message_id=assistant_message_id,
+        response=assistant_reply,
     )
