@@ -32,7 +32,8 @@ async def test_chat_creates_shared_history(client):
     hist = await client.get("/history/shared")
     assert hist.status_code == 200
     messages = hist.json()["messages"]
-    assert len(messages) == 2
-    assert messages[0]["role"] == "user"
-    assert messages[1]["role"] == "assistant"
-    assert messages[1]["content"] == "Hello from Charles!"
+    # Assert full (role, content) sequence — robust against same-second timestamp ties
+    assert [(m["role"], m["content"]) for m in messages] == [
+        ("user", "Hello"),
+        ("assistant", "Hello from Charles!"),
+    ]

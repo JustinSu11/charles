@@ -26,7 +26,7 @@ DDL = [
     )""",
     """CREATE TABLE IF NOT EXISTS messages (
         id TEXT PRIMARY KEY,
-        conversation_id TEXT NOT NULL,
+        conversation_id TEXT NOT NULL REFERENCES conversations(id),
         role TEXT NOT NULL,
         content TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -42,6 +42,9 @@ async def setup_db():
     async with test_engine.begin() as conn:
         for stmt in DDL:
             await conn.execute(text(stmt))
+        # Pre-test cleanup ensures a previous test's dirty state doesn't leak in
+        for tbl in ("messages", "conversations", "app_state"):
+            await conn.execute(text(f"DELETE FROM {tbl}"))
     yield
     async with test_engine.begin() as conn:
         for tbl in ("messages", "conversations", "app_state"):
