@@ -72,7 +72,7 @@ function pollHealth(maxAttempts = 15) {
 
 // ── Service lifecycle ─────────────────────────────────────────────────────────
 async function startServices() {
-  if (isStarting || apiProcess) return
+  if (isStarting) return
   isStarting = true
   try {
     if (apiProcess)   { apiProcess.kill();   apiProcess   = null }
