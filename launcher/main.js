@@ -20,6 +20,7 @@ let mainWindow   = null
 let tray         = null
 let apiProcess   = null
 let voiceProcess = null
+let isStarting   = false
 
 // ── Window ────────────────────────────────────────────────────────────────────
 function createWindow() {
@@ -71,47 +72,56 @@ function pollHealth(maxAttempts = 15) {
 
 // ── Service lifecycle ─────────────────────────────────────────────────────────
 async function startServices() {
-  mainWindow.webContents.send('status-update', { state: 'starting' })
+  if (isStarting || apiProcess) return
+  isStarting = true
+  try {
+    if (apiProcess)   { apiProcess.kill();   apiProcess   = null }
+    if (voiceProcess) { voiceProcess.kill(); voiceProcess = null }
 
-  apiProcess = spawn('python', [apiScript], {
-    env: { ...process.env },
-    stdio: ['ignore', 'ignore', 'pipe'],
-  })
-  apiProcess.stderr.on('data', (d) => process.stderr.write(`[API] ${d}`))
-  apiProcess.on('exit', (code) => {
-    if (code !== 0 && code !== null && apiProcess !== null) {
-      mainWindow?.webContents.send('status-update', { state: 'error', message: `API exited (${code})` })
-      apiProcess = null
-    }
-  })
+    mainWindow?.webContents.send('status-update', { state: 'starting' })
 
-  try { await pollHealth() }
-  catch (err) {
-    apiProcess?.kill(); apiProcess = null
-    mainWindow.webContents.send('status-update', { state: 'error', message: err.message })
-    throw err
-  }
-
-  voiceProcess = spawn('python', [voiceScript, '--no-preload'], {
-    env: { ...process.env },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  voiceProcess.stdout.on('data', (d) => {
-    for (const line of d.toString().split('\n')) {
-      const t = line.trim()
-      if (t.startsWith('VOICE_STATE:')) {
-        mainWindow?.webContents.send('voice-state-update', { state: t.replace('VOICE_STATE:', '').toLowerCase() })
+    apiProcess = spawn('python', [apiScript], {
+      env: { ...process.env },
+      stdio: ['ignore', 'ignore', 'pipe'],
+    })
+    apiProcess.stderr.on('data', (d) => process.stderr.write(`[API] ${d}`))
+    apiProcess.on('exit', (code) => {
+      if (code !== 0 && code !== null && apiProcess !== null) {
+        mainWindow?.webContents.send('status-update', { state: 'error', message: `API exited (${code})` })
+        apiProcess = null
       }
-    }
-  })
-  voiceProcess.on('exit', (code) => {
-    if (code !== 0 && code !== null && voiceProcess !== null) {
-      mainWindow?.webContents.send('status-update', { state: 'error', message: 'Voice service crashed' })
-      voiceProcess = null
-    }
-  })
+    })
 
-  mainWindow.webContents.send('status-update', { state: 'running' })
+    try { await pollHealth() }
+    catch (err) {
+      apiProcess?.kill(); apiProcess = null
+      mainWindow?.webContents.send('status-update', { state: 'error', message: err.message })
+      throw err
+    }
+
+    voiceProcess = spawn('python', [voiceScript, '--no-preload'], {
+      env: { ...process.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    voiceProcess.stdout.on('data', (d) => {
+      for (const line of d.toString().split('\n')) {
+        const t = line.trim()
+        if (t.startsWith('VOICE_STATE:')) {
+          mainWindow?.webContents.send('voice-state-update', { state: t.replace('VOICE_STATE:', '').toLowerCase() })
+        }
+      }
+    })
+    voiceProcess.on('exit', (code) => {
+      if (code !== 0 && code !== null && voiceProcess !== null) {
+        mainWindow?.webContents.send('status-update', { state: 'error', message: 'Voice service crashed' })
+        voiceProcess = null
+      }
+    })
+
+    mainWindow?.webContents.send('status-update', { state: 'running' })
+  } finally {
+    isStarting = false
+  }
 }
 
 function stopServices() {
