@@ -80,13 +80,14 @@ async function startServices() {
 
     mainWindow?.webContents.send('status-update', { state: 'starting' })
 
-    apiProcess = spawn('python', [apiScript], {
+    const proc = spawn('python', [apiScript], {
       env: { ...process.env },
       stdio: ['ignore', 'ignore', 'pipe'],
     })
-    apiProcess.stderr.on('data', (d) => process.stderr.write(`[API] ${d}`))
-    apiProcess.on('exit', (code) => {
-      if (code !== 0 && code !== null && apiProcess !== null) {
+    apiProcess = proc
+    proc.stderr.on('data', (d) => process.stderr.write(`[API] ${d}`))
+    proc.on('exit', (code) => {
+      if (code !== 0 && code !== null && apiProcess === proc) {
         mainWindow?.webContents.send('status-update', { state: 'error', message: `API exited (${code})` })
         apiProcess = null
       }
@@ -99,11 +100,12 @@ async function startServices() {
       throw err
     }
 
-    voiceProcess = spawn('python', [voiceScript, '--no-preload'], {
+    const vproc = spawn('python', [voiceScript, '--no-preload'], {
       env: { ...process.env },
       stdio: ['ignore', 'pipe', 'pipe'],
     })
-    voiceProcess.stdout.on('data', (d) => {
+    voiceProcess = vproc
+    vproc.stdout.on('data', (d) => {
       for (const line of d.toString().split('\n')) {
         const t = line.trim()
         if (t.startsWith('VOICE_STATE:')) {
@@ -111,8 +113,8 @@ async function startServices() {
         }
       }
     })
-    voiceProcess.on('exit', (code) => {
-      if (code !== 0 && code !== null && voiceProcess !== null) {
+    vproc.on('exit', (code) => {
+      if (code !== 0 && code !== null && voiceProcess === vproc) {
         mainWindow?.webContents.send('status-update', { state: 'error', message: 'Voice service crashed' })
         voiceProcess = null
       }
