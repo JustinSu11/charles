@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Charles</title>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+  <script src="lib/marked.min.js"></script>
+  <script src="lib/purify.min.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -452,7 +452,7 @@ function setStatus(state, message) {
   const isRunning = state === 'running';
   const isStopped = state === 'stopped' || state === 'error';
   $startBtn.style.display = isStopped ? 'inline' : 'none';
-  $stopBtn.style.display  = isRunning  ? 'inline' : 'none';
+  $stopBtn.style.display  = (isRunning || state === 'starting') ? 'inline' : 'none';
   $startBtn.disabled      = state === 'starting';
   $input.disabled         = !isRunning;
   $sendBtn.disabled       = !isRunning;
@@ -474,11 +474,14 @@ $stopBtn.addEventListener('click',  () => window.electronAPI.stop());
 document.getElementById('btn-minimize').addEventListener('click', () => window.electronAPI.minimize());
 document.getElementById('btn-close').addEventListener('click',    () => window.electronAPI.closeWindow());
 
-window.electronAPI.onStatusUpdate(({ state, message }) => {
+const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => {
   setStatus(state, message);
-  if (state === 'running') loadHistory().then(() => connectWebSocket());
+  if (state === 'running') loadHistory().then(() => {
+    if (!socket || socket.readyState === WebSocket.CLOSED) connectWebSocket();
+  });
 });
-window.electronAPI.onVoiceState(({ state }) => setVoiceState(state));
+const cleanupVoice = window.electronAPI.onVoiceState(({ state }) => setVoiceState(state));
+window.addEventListener('beforeunload', () => { cleanupStatus(); cleanupVoice(); });
 
 // Initial state
 setStatus('stopped');
