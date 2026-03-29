@@ -45,11 +45,11 @@ function createTray() {
   tray = new Tray(path.join(__dirname, 'assets', 'tray-icon.png'))
   tray.setToolTip('Charles')
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Show', click: () => mainWindow.show() },
+    { label: 'Show', click: () => mainWindow?.show() },
     { type: 'separator' },
     { label: 'Quit', click: () => { app.isQuiting = true; stopServices(); app.quit() } },
   ]))
-  tray.on('double-click', () => mainWindow.show())
+  tray.on('double-click', () => mainWindow?.show())
 }
 
 // ── Health poll ───────────────────────────────────────────────────────────────
@@ -139,8 +139,8 @@ function registerIPC() {
     catch (err) { return { ok: false, error: err.message } }
   })
   ipcMain.handle('stop-services',  () => { stopServices(); return { ok: true } })
-  ipcMain.handle('minimize-window', () => mainWindow.minimize())
-  ipcMain.handle('close-window',    () => mainWindow.close())  // triggers hide-to-tray handler
+  ipcMain.handle('minimize-window', () => mainWindow?.minimize())
+  ipcMain.handle('close-window',    () => mainWindow?.close())  // triggers hide-to-tray handler
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
