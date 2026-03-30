@@ -139,7 +139,7 @@ async function startServices() {
     })
     vproc.on('exit', (code) => {
       if (code !== 0 && code !== null && voiceProcess === vproc) {
-        mainWindow?.webContents.send('status-update', { state: 'error', message: 'Voice service crashed' })
+        mainWindow?.webContents.send('voice-state-update', { state: 'error' })
         voiceProcess = null
       }
     })

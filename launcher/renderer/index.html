@@ -39,6 +39,7 @@
       align-items: center;
       gap: 12px;
       flex-shrink: 0;
+      -webkit-app-region: drag;
     }
     header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .03em; }
     #ws-status {
@@ -179,9 +180,7 @@
       display: flex; align-items: center; gap: 10px;
       padding: 10px 16px; border-bottom: 1px solid var(--border);
       flex-shrink: 0; background: #111;
-      -webkit-app-region: drag;
     }
-    #top-bar button { -webkit-app-region: no-drag; }
 
     .status-dot { width:8px; height:8px; border-radius:50%; background:#555; flex-shrink:0; }
     .status-dot.running  { background: var(--accent); }
@@ -194,6 +193,7 @@
     #voice-pill.listening    { display:inline; background:#2e1065; color:#a78bfa; }
     #voice-pill.transcribing { display:inline; background:#1f2937; color:#9ca3af; }
     #voice-pill.speaking     { display:inline; background:#431407; color:#fb923c; }
+    #voice-pill.error        { display:inline; background:#1f2937; color:#9ca3af; }
 
     #start-btn { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:5px 14px; font-size:.8rem; font-weight:600; cursor:pointer; }
     #start-btn:hover:not(:disabled) { background:#1d4ed8; }
@@ -461,7 +461,7 @@ function setStatus(state, message) {
 }
 
 function setVoiceState(state) {
-  const labels = { listening:'🎙 Listening', transcribing:'📝 Transcribing…', speaking:'🔊 Speaking' };
+  const labels = { listening:'🎙 Listening', transcribing:'📝 Transcribing…', speaking:'🔊 Speaking', error:'Voice offline' };
   $voicePill.className   = state;
   $voicePill.textContent = labels[state] ?? '';
 }
