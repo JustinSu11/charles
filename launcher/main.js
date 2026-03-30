@@ -3,7 +3,7 @@
  * Manages the window, system tray, and FastAPI + voice subprocesses.
  */
 
-const { app, BrowserWindow, ipcMain, Tray, Menu } = require('electron')
+const { app, BrowserWindow, ipcMain, nativeImage, Tray, Menu } = require('electron')
 const path   = require('path')
 const http   = require('http')
 const { spawn } = require('child_process')
@@ -41,8 +41,20 @@ function createWindow() {
 }
 
 // ── Tray ──────────────────────────────────────────────────────────────────────
+function makeTrayIcon() {
+  // Build a 16x16 blue (#3b82f6 = rgb 59,130,246) icon from raw RGBA bytes.
+  // Avoids relying on a PNG file being valid — nativeImage handles encoding.
+  const size = 16
+  const buf  = Buffer.alloc(size * size * 4)
+  for (let i = 0; i < size * size; i++) {
+    buf[i * 4 + 0] = 59;  buf[i * 4 + 1] = 130
+    buf[i * 4 + 2] = 246; buf[i * 4 + 3] = 255
+  }
+  return nativeImage.createFromBuffer(buf, { width: size, height: size })
+}
+
 function createTray() {
-  tray = new Tray(path.join(__dirname, 'assets', 'tray-icon.png'))
+  tray = new Tray(makeTrayIcon())
   tray.setToolTip('Charles')
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Show', click: () => mainWindow?.show() },
