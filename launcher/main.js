@@ -86,6 +86,12 @@ async function startServices() {
     })
     apiProcess = proc
     proc.stderr.on('data', (d) => process.stderr.write(`[API] ${d}`))
+    proc.on('error', (err) => {
+      if (apiProcess === proc) {
+        mainWindow?.webContents.send('status-update', { state: 'error', message: `Failed to start API: ${err.message}` })
+        apiProcess = null
+      }
+    })
     proc.on('exit', (code) => {
       if (code !== 0 && code !== null && apiProcess === proc) {
         mainWindow?.webContents.send('status-update', { state: 'error', message: `API exited (${code})` })
@@ -111,6 +117,12 @@ async function startServices() {
         if (t.startsWith('VOICE_STATE:')) {
           mainWindow?.webContents.send('voice-state-update', { state: t.replace('VOICE_STATE:', '').toLowerCase() })
         }
+      }
+    })
+    vproc.on('error', (err) => {
+      if (voiceProcess === vproc) {
+        mainWindow?.webContents.send('status-update', { state: 'error', message: `Failed to start voice: ${err.message}` })
+        voiceProcess = null
       }
     })
     vproc.on('exit', (code) => {
