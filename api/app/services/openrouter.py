@@ -6,7 +6,7 @@ load_dotenv()
 
 OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
-MODEL = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
+MODEL = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-v3.2")
 
 SYSTEM_PROMPT = (
     "You are Charles, a helpful AI assistant. "
