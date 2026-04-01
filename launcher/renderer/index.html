@@ -129,8 +129,7 @@
       font-style: italic;
       padding: 8px 4px;
     }
-    .thinking span { animation: blink 1.2s step-start infinite; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+    /* dots are driven by JS setInterval — no CSS animation needed */
 
     /* ── Input bar ── */
     #input-bar {
@@ -247,6 +246,7 @@ const WS_URL   = 'ws://localhost:8000/ws';
 // ── State ─────────────────────────────────────────────────────────────────────
 let conversationId      = null;   // set after first turn or history load
 let pendingTurn         = null;   // DOM node for the "thinking…" indicator
+let thinkingInterval    = null;   // setInterval ID for the animated dots
 let pendingVoiceWrapper = null;   // .turn wrapper rendered immediately on voice transcript
 let socket              = null;
 
@@ -293,16 +293,26 @@ function renderTurn(turn) {
 function showThinking() {
   pendingTurn = document.createElement("div");
   pendingTurn.className = "thinking";
+
   const label = document.createTextNode("Charles is thinking");
   const dots  = document.createElement("span");
-  dots.textContent = "…";
+  dots.textContent = ".";
+
   pendingTurn.appendChild(label);
   pendingTurn.appendChild(dots);
   $messages.appendChild(pendingTurn);
   scrollToBottom();
+
+  // Cycle 1 → 2 → 3 → 1 … every 400 ms
+  let count = 1;
+  thinkingInterval = setInterval(() => {
+    count = (count % 3) + 1;
+    dots.textContent = ".".repeat(count);
+  }, 400);
 }
 
 function clearThinking() {
+  if (thinkingInterval) { clearInterval(thinkingInterval); thinkingInterval = null; }
   if (pendingTurn) { pendingTurn.remove(); pendingTurn = null; }
 }
 
