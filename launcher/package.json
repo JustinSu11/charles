@@ -1,0 +1,24 @@
+{
+  "name": "charles",
+  "version": "1.0.0",
+  "description": "Charles AI assistant desktop app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist":  "electron-builder"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "build": {
+    "appId": "com.charles.assistant",
+    "productName": "Charles",
+    "win": { "target": "nsis" },
+    "extraResources": [
+      { "from": "../api",   "to": "api"   },
+      { "from": "../voice", "to": "voice" }
+    ]
+  }
+}

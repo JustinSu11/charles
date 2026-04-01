@@ -1,0 +1,16 @@
+# Drop any .ppn wake word model files here — ALL of them are loaded simultaneously.
+#
+# Recommended: generate both variants at https://console.picovoice.ai/ppn
+# (select your OS platform for each, one keyword per model)
+#
+#   hey-charles.ppn   ← "Hey Charles"
+#   charles.ppn       ← "Charles"
+#
+# Both files will be auto-discovered and loaded together so either phrase
+# triggers a voice interaction.  You can add as many variants as you like.
+#
+# Piper voice model files also live here (auto-downloaded on first run):
+#   en_US-lessac-medium.onnx
+#   en_US-lessac-medium.onnx.json
+#
+# Source: https://huggingface.co/rhasspy/piper-voices

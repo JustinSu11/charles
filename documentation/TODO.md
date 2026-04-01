@@ -16,28 +16,28 @@
 
 ### PostgreSQL
 
-- [ ] Design database schema: `conversations` table (id, interface, timestamp) and `messages` table (id, conversation_id, role, content, timestamp)
-- [ ] Write initialization SQL script that runs on first container start
-- [ ] Add PostgreSQL service to `docker-compose.yml` with named volume
-- [ ] Verify data persists across `docker-compose down` / `up` cycles
+- [x] Design database schema: `conversations` table (id, interface, timestamp) and `messages` table (id, conversation_id, role, content, timestamp)
+- [x] Write initialization SQL script that runs on first container start
+- [x] Add PostgreSQL service to `docker-compose.yml` with named volume
+- [x] Verify data persists across `docker-compose down` / `up` cycles
 
 ### Charles API Service
 
-- [ ] Set up FastAPI project in `/api` with health check endpoint (`GET /health`)
-- [ ] Implement OpenRouter client (`meta-llama/llama-3.3-70b-instruct:free`) with API key from env
-- [ ] Implement `POST /chat` endpoint (message + conversation ID → OpenRouter → store in PostgreSQL → return response)
-- [ ] Implement `GET /history/{conversation_id}` endpoint
-- [ ] Implement `DELETE /history/{conversation_id}` endpoint
-- [ ] Add CORS config (allow Open WebUI on localhost:3000 and voice service)
-- [ ] Add error handling for OpenRouter failures (rate limits, timeouts)
-- [ ] Write Dockerfile for the API service (`python:3.11-slim`)
-- [ ] Add Charles API service to `docker-compose.yml`
+- [x] Set up FastAPI project in `/api` with health check endpoint (`GET /health`)
+- [x] Implement OpenRouter client (`qwen/qwen3-next-80b-a3b-instruct:free`) with API key from env
+- [x] Implement `POST /chat` endpoint (message + conversation ID → OpenRouter → store in PostgreSQL → return response)
+- [x] Implement `GET /history/{conversation_id}` endpoint
+- [x] Implement `DELETE /history/{conversation_id}` endpoint
+- [x] Add CORS config (allow Open WebUI on localhost:3000 and voice service)
+- [x] Add error handling for OpenRouter failures (rate limits, timeouts)
+- [x] Write Dockerfile for the API service (`python:3.11-slim`)
+- [x] Add Charles API service to `docker-compose.yml`
 
 ### Open WebUI
 
-- [ ] Configure Open WebUI container to point to Charles API as its backend
+- [x] Configure Open WebUI container to point to Charles API as its backend
 - [ ] Verify chat history is shared between voice and web interfaces
-- [ ] Confirm web interface is accessible at `localhost:3000` after `docker-compose up`
+- [x] Confirm web interface is accessible at `localhost:3000` after `docker-compose up`
 
 ## Phase 2 — MCP Server Integration
 
@@ -50,15 +50,15 @@
 
 ## Phase 3 — Voice Service
 
-- [ ] Generate custom "Hey Charles" wake word model (`.ppn`) via Picovoice Console
-- [ ] Integrate `pvporcupine` with always-on microphone loop
-- [ ] Integrate `openai-whisper` — benchmark base/small/medium, auto-download on first run
-- [ ] Implement audio capture buffer + silence detection
-- [ ] Integrate `piper-tts` — select English voice, implement TTS playback pipeline
-- [ ] Implement speech interruption (wake word during playback stops and listens)
-- [ ] Implement HTTP client to send transcribed text to `POST /chat`
+- [x] Generate custom "Hey Charles" wake word model (`.ppn`) via Picovoice Console _(manual: console.picovoice.ai → place at `voice/models/hey-charles.ppn`)_
+- [x] Integrate `pvporcupine` with always-on microphone loop (`wake_word.py` — `run_forever()` + `wait_for_wake_word()`; falls back to built-in keyword if `.ppn` missing)
+- [x] Integrate `openai-whisper` — benchmark base/small/medium, auto-download on first run (`stt.py` — model selectable via `WHISPER_MODEL` in `.env`)
+- [x] Implement audio capture buffer + silence detection (`audio.py` — RMS energy gate, configurable threshold + duration)
+- [x] Integrate `piper-tts` — select English voice, implement TTS playback pipeline (`tts.py` — binary + model auto-download, `en_US-lessac-medium` default)
+- [x] Implement speech interruption (wake word during playback stops and listens) (`tts.stop_speaking()` called from `_on_wake()` in `main.py`)
+- [x] Implement HTTP client to send transcribed text to `POST /chat` (`api_client.py` — persists `conversation_id` across turns, graceful error handling)
 - [ ] Test full audio pipeline on Windows (WASAPI), macOS (CoreAudio), Linux (ALSA)
-- [ ] Implement audio device enumeration for users with multiple mics/speakers
+- [x] Implement audio device enumeration for users with multiple mics/speakers (`audio.py` — `list_input_devices()`, `list_output_devices()`; `--list-devices` CLI flag in `main.py`)
 
 ## Phase 4 — GUI Launcher
 

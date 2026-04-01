@@ -5,7 +5,7 @@ Charles Core API — FastAPI backend running in Docker.
 ## What goes here
 
 - `main.py` — FastAPI app entry point
-- `openrouter.py` — OpenRouter API client (`meta-llama/llama-3.3-70b-instruct:free`)
+- `openrouter.py` — OpenRouter API client (`qwen/qwen3-next-80b-a3b-instruct:free`)
 - `database.py` — PostgreSQL connection + query helpers
 - `mcp_client.py` — MCP protocol client (connects to MCP servers, calls tools)
 - `Dockerfile` — Image definition (`python:3.11-slim`)

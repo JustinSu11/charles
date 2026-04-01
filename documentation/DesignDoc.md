@@ -7,15 +7,17 @@
 Charles is a **hands-free voice AI assistant** with dual interfaces, designed to provide accessible AI capabilities for users both at their desk and away from their computer. The project enables users to interact with AI while doing other tasks (folding clothes, cooking, etc.) through natural voice commands, while also providing a traditional web interface for visual tasks.
 
 **Primary Use Case:**
-"Hey Charles, check if there's any React vulnerability news, then scan my GitHub repos to see if any of my projects are exposed" - *all while folding laundry*
+"Hey Charles, check if there's any React vulnerability news, then scan my GitHub repos to see if any of my projects are exposed" - _all while folding laundry_
 
 **Dual Purpose:**
+
 1. **Deliver**: Self-hosted voice + web AI assistant with MCP integration
 2. **Learn**: Docker, voice processing (STT/TTS), MCP protocol, GUI development, cross-platform deployment
 
 ## Goals
 
 ### Project Goals
+
 1. **Hands-Free Voice Interaction**: Primary interface via wake word + voice commands
 2. **Dual Interface**: Voice for hands-free + Web UI for visual tasks
 3. **One-Click Launch**: Non-technical users can start Charles with a single click
@@ -24,6 +26,7 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 6. **MCP Integration**: Connect 3 MCP servers (VirusTotal, CVE Details, Tech News)
 
 ### Learning Objectives
+
 1. **Voice Processing**: Speech-to-text (Whisper), Text-to-speech (Piper), Wake word detection
 2. **Docker Fundamentals**: Multi-container orchestration, volume management
 3. **MCP Protocol**: Model Context Protocol server integration
@@ -34,6 +37,7 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 ## Scope
 
 ### In Scope
+
 - **Voice Interface**: Wake word detection, STT, TTS, always-listening mode
 - **Web Interface**: Open WebUI for visual chat, code display, links
 - **GUI Launcher**: One-click desktop app to start/stop Charles
@@ -45,6 +49,7 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 - **Cross-platform audio**: Handle Windows, Mac, Linux audio differences
 
 ### Out of Scope
+
 - Cloud deployment (self-hosted only)
 - Mobile app development
 - Custom training/fine-tuning models
@@ -104,6 +109,7 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 ### Component Breakdown
 
 **1. GUI Launcher (charles-launcher.py)**
+
 - Desktop app with start/stop controls
 - First-time setup wizard (API key input)
 - Status indicators (listening, processing, stopped)
@@ -111,6 +117,7 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 - Settings management
 
 **2. Voice Service (Native Python App)**
+
 - Runs on host machine (audio device access)
 - Porcupine wake word detection ("Hey Charles")
 - Whisper STT (local, offline)
@@ -118,11 +125,13 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 - Communicates with Docker backend via HTTP
 
 **3. Docker Backend**
+
 - PostgreSQL: Shared conversation history
 - Charles API: OpenRouter + MCP orchestration
 - Open WebUI: Web interface
 
 **4. MCP Servers (External APIs)**
+
 - VirusTotal: Check API keys, file hashes
 - CVE Details: Search vulnerabilities
 - Tech News: Aggregate tech/security news
@@ -130,6 +139,7 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 ## Technology Stack
 
 ### Launcher & Voice (Native - Runs on Host)
+
 - **Python 3.10+**: Core runtime
 - **Tkinter**: GUI framework (cross-platform, built-in)
 - **Porcupine (Picovoice)**: Wake word detection
@@ -139,19 +149,22 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 - **Requests**: HTTP client for backend API
 
 ### Backend (Docker Containers)
+
 - **PostgreSQL 16**: Database for shared state
 - **FastAPI** or **Flask**: Charles API service
 - **Open WebUI**: Web interface (ghcr.io/open-webui/open-webui:main)
 - **Docker Compose**: Multi-container orchestration
 
 ### AI & APIs
-- **OpenRouter API**: Cloud LLM inference (meta-llama/llama-3.3-70b-instruct:free)
+
+- **OpenRouter API**: Cloud LLM inference (qwen/qwen3-next-80b-a3b-instruct:free)
 - **MCP Protocol**: Model Context Protocol for tool integration
 - **VirusTotal API**: Security scanning
 - **CVE Details API**: Vulnerability data
 - **Tech News APIs**: News aggregation (NewsAPI, etc.)
 
 ### Infrastructure
+
 - Port 3000: Open WebUI
 - Port 8000: Charles API
 - Port 5432: PostgreSQL
@@ -162,6 +175,7 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 ### Hardware
 
 **Minimum:**
+
 - **CPU**: Dual-core processor (2+ GHz)
 - **RAM**: 6GB (4GB backend + 2GB voice service)
 - **Storage**: 3GB free (Docker images + Whisper model)
@@ -171,6 +185,7 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 - **Network**: Internet connection for OpenRouter API
 
 **Recommended:**
+
 - **CPU**: Quad-core processor
 - **RAM**: 8GB
 - **Storage**: 5GB free
@@ -180,11 +195,13 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 ### Software
 
 **Required:**
+
 - **Docker Desktop**: Latest stable version
 - **Python 3.10+**: For voice service and launcher
 - **Operating System**: Windows 10/11, macOS 10.15+, or Linux (Ubuntu 20.04+)
 
 **Auto-Installed:**
+
 - Python packages (via pip install -r requirements.txt)
 - Docker images (auto-pulled on first run)
 - Whisper models (auto-downloaded on first run)
@@ -193,17 +210,20 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 ### Why These Requirements?
 
 **Voice Processing Local:**
+
 - Privacy: Voice data never leaves your machine
 - Speed: No API latency for STT/TTS
 - Offline: Works without internet (except for AI responses)
 - Cost: No per-minute charges for transcription
 
 **Backend in Docker:**
+
 - Consistency: Same environment across platforms
 - Isolation: Clean, reproducible setup
 - Easy updates: Pull new images
 
 **Trade-offs:**
+
 - ✅ Complete privacy (voice data local)
 - ✅ Fast voice processing
 - ⚠️ Slightly higher RAM usage (6GB vs 4GB web-only)
@@ -212,6 +232,7 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 ## Deliverables
 
 ### 1. GUI Launcher ⏳ (Approved)
+
 - **charles-launcher.py**: Desktop application
 - Start/stop button with status indicator
 - First-time setup wizard (API key input)
@@ -220,6 +241,7 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 - Cross-platform executable (PyInstaller)
 
 ### 2. Voice Service ⏳ (Approved)
+
 - **charles-voice/**: Native Python application
 - Wake word detection ("Hey Charles")
 - Speech-to-text (Whisper local)
@@ -229,24 +251,28 @@ Charles is a **hands-free voice AI assistant** with dual interfaces, designed to
 - Cross-platform audio handling
 
 ### 3. Docker Backend 🚧 (Updated)
+
 - **PostgreSQL**: Shared database
 - **Charles API**: OpenRouter + MCP orchestration
 - **Open WebUI**: Web interface
 - **docker-compose.yml**: Multi-container setup
 
 ### 4. MCP Server Integration 🚧 (In Progress)
+
 - VirusTotal MCP server
 - CVE Details MCP server
 - Tech News MCP server
 - MCP protocol client library
 
 ### 5. Documentation ⏳
+
 - **README.md**: Quick start guide
 - **USER_GUIDE.md**: Voice commands, features
 - **DEVELOPER.md**: Architecture, contributing
 - **TROUBLESHOOTING.md**: Common issues
 
 ### 6. Packaging 🚧
+
 - PyInstaller build scripts
 - Distributable ZIP package
 - Platform-specific installers (optional v2.0)
@@ -311,6 +337,7 @@ Option B: Web UI (visual)
 ## Quality Standards
 
 ### Testing Requirements
+
 - ⏳ Voice recognition accuracy testing (different accents, noise levels)
 - ⏳ Wake word false positive/negative rates
 - ⏳ Cross-platform audio pipeline validation
@@ -320,14 +347,16 @@ Option B: Web UI (visual)
 - ⏳ First-time setup wizard testing
 
 ### Code Standards
+
 - Clear commit messages (conventional commits)
-- Feature branch workflow (main, develop, feature/*)
+- Feature branch workflow (main, develop, feature/\*)
 - Code review before merging
 - Type hints in Python code
 - Docstrings for public functions
 - Error handling for audio failures
 
 ### Documentation
+
 - README with quick start (< 5 steps)
 - Voice command examples
 - Troubleshooting guide for audio issues
@@ -335,6 +364,7 @@ Option B: Web UI (visual)
 - API documentation for backend
 
 ### User Experience
+
 - Non-technical users can install and run
 - Setup process < 5 minutes
 - Clear error messages
@@ -344,6 +374,7 @@ Option B: Web UI (visual)
 ## Dependencies
 
 ### External Dependencies
+
 - **Docker Desktop**: Backend containers
 - **OpenRouter API**: LLM inference (requires API key)
 - **MCP Servers**: External APIs (VirusTotal, CVE, News)
@@ -351,6 +382,7 @@ Option B: Web UI (visual)
 - **Audio drivers**: Platform-specific (ALSA/PulseAudio on Linux, CoreAudio on Mac, WASAPI on Windows)
 
 ### Python Dependencies (Voice Service)
+
 ```
 openai-whisper==20231117
 piper-tts==1.2.0
@@ -361,6 +393,7 @@ python-dotenv==1.0.0
 ```
 
 ### Docker Images
+
 ```
 postgres:16
 ghcr.io/open-webui/open-webui:main
@@ -368,6 +401,7 @@ python:3.11-slim (for Charles API)
 ```
 
 ### Internal Dependencies
+
 - Voice service depends on backend API
 - Web UI depends on backend API
 - Backend API depends on PostgreSQL
@@ -382,6 +416,7 @@ python:3.11-slim (for Charles API)
 ## Success Criteria
 
 ### MVP (Minimum Viable Product)
+
 - ⏳ GUI launcher starts with one click
 - ⏳ Voice wake word detection works ("Hey Charles")
 - ⏳ Speech-to-text accurately transcribes commands
@@ -393,6 +428,7 @@ python:3.11-slim (for Charles API)
 - ⏳ Data persists across restarts
 
 ### Full Release v1.0
+
 - ⏳ Cross-platform support (Windows, Mac, Linux)
 - ⏳ Packaged executable (no manual Python install)
 - ⏳ Complete documentation
@@ -401,6 +437,7 @@ python:3.11-slim (for Charles API)
 - ⏳ User guide with voice command examples
 
 ### Future Enhancements (v2.0)
+
 - System tray integration (minimize to tray)
 - Auto-start on boot (optional setting)
 - Custom wake word training
@@ -414,12 +451,14 @@ python:3.11-slim (for Charles API)
 ### Current Risks
 
 **1. Team Approval Pending** - HIGH
+
 - **Risk**: Client/team may not approve voice-first architecture
 - **Impact**: Major rework required, delays timeline
 - **Mitigation**: Document current state, be ready to revert to web-only
 - **Status**: PENDING (awaiting approval 2026-02-14)
 
 **2. Cross-Platform Audio Complexity** - MEDIUM
+
 - **Risk**: Audio device access may fail on some platforms
 - **Impact**: Voice features don't work for some users
 - **Mitigation**:
@@ -429,6 +468,7 @@ python:3.11-slim (for Charles API)
 - **Status**: Monitoring (not implemented yet)
 
 **3. Wake Word False Positives** - MEDIUM
+
 - **Risk**: Wake word triggers unintentionally
 - **Impact**: Unexpected responses, user frustration
 - **Mitigation**:
@@ -438,6 +478,7 @@ python:3.11-slim (for Charles API)
 - **Status**: Monitoring (not implemented yet)
 
 **4. Voice Recognition Accuracy** - MEDIUM
+
 - **Risk**: Whisper may not accurately transcribe all accents/environments
 - **Impact**: Commands misunderstood, poor UX
 - **Mitigation**:
@@ -447,6 +488,7 @@ python:3.11-slim (for Charles API)
 - **Status**: Monitoring (not implemented yet)
 
 **5. Non-Technical User Setup** - LOW
+
 - **Risk**: Users struggle with first-time setup (API key, Docker)
 - **Impact**: Adoption barrier, support burden
 - **Mitigation**:
@@ -456,6 +498,7 @@ python:3.11-slim (for Charles API)
 - **Status**: Monitoring (GUI wizard designed)
 
 **6. MCP Server Integration** - MEDIUM (carried over)
+
 - **Risk**: MCP protocol may be complex to integrate
 - **Impact**: Core features delayed
 - **Mitigation**: Start with simple MCP examples, iterate
@@ -468,6 +511,7 @@ python:3.11-slim (for Charles API)
 **Last Updated**: 2026-02-18
 
 ### Recent Activity
+
 - **2026-02-13**: Major architecture redesign
   - Identified hands-free voice as primary use case
   - Designed dual interface (voice + web)
@@ -483,17 +527,20 @@ python:3.11-slim (for Charles API)
   - Cross-platform startup scripts functional
 
 ### Active Work
+
 - **Status**: ACTIVE - Architecture approved 2026-02-16
 - **Focus**: Dual interface (voice + web) with GUI launcher
 - **Blockers**: None
 
 ### Decision Points (2026-02-14) — Resolved 2026-02-16
+
 1. ✅ **Approved** — Voice-first dual interface approach
 2. ✅ **Approved** — One-click GUI launcher (vs command-line)
 3. ✅ **Approved** — 6GB RAM requirement (vs 4GB web-only)
 4. Proceed with PoC scope (3 MCP servers)?
 
 ### Next Steps (If Approved)
+
 1. Build GUI launcher prototype (charles-launcher.py)
 2. Implement wake word detection (Porcupine)
 3. Integrate Whisper STT (local)
@@ -506,6 +553,7 @@ python:3.11-slim (for Charles API)
 10. Document voice commands and setup
 
 ### Next Steps (If Not Approved - Fallback Plan)
+
 1. Continue with web-only Open WebUI approach
 2. Focus on MCP server integration
 3. Complete 3 MCP servers (VirusTotal, CVE, News)
@@ -530,13 +578,15 @@ python:3.11-slim (for Charles API)
 ### Phase 1 — Docker Backend
 
 #### PostgreSQL
+
 - [ ] Design database schema: `conversations` table (id, interface, timestamp) and `messages` table (id, conversation_id, role, content, timestamp)
 - [ ] Write initialization SQL script that runs on first container start
 - [ ] Verify data persists across `docker-compose down` / `up` cycles using the named volume
 
 #### Charles API Service
+
 - [ ] Set up FastAPI (or Flask) project inside `/api` with a health check endpoint (`GET /health`)
-- [ ] Implement OpenRouter client with model configuration (`meta-llama/llama-3.3-70b-instruct:free`) and API key loaded from environment
+- [ ] Implement OpenRouter client with model configuration (`qwen/qwen3-next-80b-a3b-instruct:free`) and API key loaded from environment
 - [ ] Implement `POST /chat` endpoint that accepts a message and conversation ID, calls OpenRouter, stores the exchange in PostgreSQL, and returns the response
 - [ ] Implement `GET /history/{conversation_id}` endpoint to retrieve message history
 - [ ] Implement `DELETE /history/{conversation_id}` endpoint to clear history
@@ -545,6 +595,7 @@ python:3.11-slim (for Charles API)
 - [ ] Write Dockerfile for the API service using `python:3.11-slim`
 
 #### Open WebUI
+
 - [ ] Configure Open WebUI container to point to Charles API as its backend
 - [ ] Verify chat history is shared between voice and web interfaces (same conversation ID scheme)
 - [ ] Confirm web interface is accessible at `localhost:3000` after `docker-compose up`
@@ -554,11 +605,13 @@ python:3.11-slim (for Charles API)
 ### Phase 2 — MCP Server Integration
 
 #### MCP Client (Charles API)
+
 - [ ] Implement MCP protocol client in the Charles API that can connect to, discover, and call tools on MCP servers
 - [ ] Integrate MCP tool-calling into the OpenRouter request flow (function/tool calling)
 - [ ] Add error handling for MCP server failures so the assistant degrades gracefully without crashing
 
 #### VirusTotal MCP Server
+
 - [ ] Create MCP server with the following tools:
   - Scan a URL for threats
   - Look up a file hash
@@ -568,6 +621,7 @@ python:3.11-slim (for Charles API)
 - [ ] Register server with Charles API and verify end-to-end tool call works
 
 #### Vulnerability Database MCP Server
+
 > ⚠️ **Note**: Final vulnerability data source TBD — evaluate available options before building. Design the MCP server interface so the underlying data source can be swapped without changing how Charles API calls it.
 
 - [ ] Evaluate and select vulnerability database source (consider: NVD, CVE Details, OSV, Vulners, or others)
@@ -579,6 +633,7 @@ python:3.11-slim (for Charles API)
 - [ ] Register server with Charles API and verify end-to-end tool call works
 
 #### Tech News MCP Server
+
 - [ ] Select news aggregation source (NewsAPI, Hacker News API, or RSS feeds)
 - [ ] Create MCP server with the following tools:
   - Fetch recent tech/security headlines
@@ -592,6 +647,7 @@ python:3.11-slim (for Charles API)
 ### Phase 3 — Voice Service
 
 #### Wake Word Detection
+
 - [ ] Generate custom "Hey Charles" wake word model (`.ppn` file) via Picovoice Console
 - [ ] Integrate `pvporcupine` into the voice service with the custom model file
 - [ ] Implement the always-on microphone loop that listens for the wake word
@@ -600,6 +656,7 @@ python:3.11-slim (for Charles API)
 - [ ] Handle microphone access errors gracefully with a clear error message to the user
 
 #### Speech-to-Text (Whisper)
+
 - [ ] Integrate `openai-whisper` into the voice service
 - [ ] Benchmark `base`, `small`, and `medium` model sizes for accuracy vs. latency — document results and select one
 - [ ] Auto-download the selected Whisper model on first run if not present
@@ -609,6 +666,7 @@ python:3.11-slim (for Charles API)
 - [ ] Add transcription error handling (empty result, low confidence)
 
 #### Text-to-Speech (Piper)
+
 - [ ] Integrate `piper-tts` into the voice service
 - [ ] Select default English voice model and auto-download on first run
 - [ ] Implement TTS playback pipeline: receive text from API → synthesize → play through speakers
@@ -616,11 +674,13 @@ python:3.11-slim (for Charles API)
 - [ ] Add audio output device selection/fallback
 
 #### Voice Service API Client
+
 - [ ] Implement HTTP client in the voice service that sends transcribed text to `POST /chat` on the Charles API
 - [ ] Use a consistent `voice` conversation ID so voice history is tracked separately from web history
 - [ ] Handle API errors (service not running, timeout, bad response) and speak a fallback error message to the user
 
 #### Cross-Platform Audio
+
 - [ ] Test full audio pipeline (mic input → STT → TTS → speaker output) on Windows (WASAPI)
 - [ ] Test full audio pipeline on macOS (CoreAudio)
 - [ ] Test full audio pipeline on Linux (ALSA/PulseAudio)
@@ -682,23 +742,27 @@ python:3.11-slim (for Charles API)
 ## Open Questions
 
 **Technical:**
+
 - Which Whisper model size? (base vs small vs medium - tradeoff: accuracy vs speed)
 - ~~Custom wake word or pre-trained?~~ **RESOLVED**: Use Porcupine console to generate a custom "Hey Charles" `.ppn` model. Runs fully locally, free for personal use.
 - Audio buffer size for low latency?
 - How to handle audio device selection (multiple mics/speakers)?
 
 **User Experience:**
+
 - Should launcher minimize to system tray or taskbar?
 - Auto-start on boot (default yes or no)?
 - Visual indicator when Charles is listening?
 - How to handle voice errors (repeat? show in web UI?)
 
 **Scope:**
+
 - Add push-to-talk mode as alternative to wake word?
 - Support custom wake word training?
 - Multi-user profiles on same machine?
 
 **Deployment:**
+
 - Distribute as ZIP or proper installer?
 - Code sign executables? (costs money)
 - Auto-update mechanism for v2.0?

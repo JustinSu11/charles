@@ -1,0 +1,10 @@
+# Place platform-specific Piper binaries here.
+#
+# File names:
+#   Windows  : piper.exe
+#   macOS    : piper
+#   Linux    : piper
+#
+# The binary is downloaded automatically by tts.py on first run.
+# You can also download it manually from:
+#   https://github.com/rhasspy/piper/releases
