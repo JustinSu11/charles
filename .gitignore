@@ -174,3 +174,8 @@ voice/models/*.onnx.json
 # macOS/Linux teammates: regenerate from https://console.picovoice.ai for your platform.
 
 # Whisper model cache lives in ~/.cache/whisper (outside the repo)
+
+# ── Tool / IDE metadata — never commit ───────────────────────────────────────
+.superpowers/
+.claude/
+voice/preview_*.wav
