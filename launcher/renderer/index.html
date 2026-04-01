@@ -183,9 +183,10 @@
     }
 
     .status-dot { width:8px; height:8px; border-radius:50%; background:#555; flex-shrink:0; }
-    .status-dot.running  { background: var(--accent); }
-    .status-dot.starting { background: #f59e0b; }
-    .status-dot.error    { background: #ef4444; }
+    .status-dot.initializing { background: #f59e0b; }
+    .status-dot.ready        { background: var(--accent); }
+    .status-dot.voice-active { background: var(--accent); }
+    .status-dot.error        { background: #ef4444; }
 
     #status-label { font-size:.8rem; color:var(--text-muted); flex:1; }
 
@@ -448,16 +449,22 @@ const $voicePill = document.getElementById('voice-pill');
 
 function setStatus(state, message) {
   $dot.className = `status-dot ${state}`;
-  $label.textContent = { stopped:'Stopped', starting:'Starting…', running:'Running', error: message || 'Error' }[state] ?? state;
-  const isRunning = state === 'running';
-  const isStopped = state === 'stopped' || state === 'error';
-  $startBtn.style.display = isStopped ? 'inline' : 'none';
-  $stopBtn.style.display  = (isRunning || state === 'starting') ? 'inline' : 'none';
-  $startBtn.disabled      = state === 'starting';
-  $input.disabled         = !isRunning;
-  $sendBtn.disabled       = !isRunning;
-  $input.placeholder      = isRunning ? 'Message Charles…' : 'Start Charles to begin chatting';
-  if (!isRunning) { $voicePill.className = ''; $voicePill.textContent = ''; }
+  $label.textContent = {
+    initializing: 'Starting…',
+    ready:         'Ready',
+    'voice-active':'Voice Active',
+    error:          message || 'Error',
+  }[state] ?? state;
+
+  const isReady       = state === 'ready' || state === 'voice-active';
+  const isVoiceActive = state === 'voice-active';
+
+  $startBtn.style.display = state === 'ready'   ? 'inline' : 'none';
+  $stopBtn.style.display  = isVoiceActive        ? 'inline' : 'none';
+  $input.disabled         = !isReady;
+  $sendBtn.disabled       = !isReady;
+  $input.placeholder      = isReady ? 'Message Charles…' : 'Charles is starting…';
+  if (!isVoiceActive) { $voicePill.className = ''; $voicePill.textContent = ''; }
 }
 
 function setVoiceState(state) {
@@ -476,15 +483,18 @@ document.getElementById('btn-close').addEventListener('click',    () => window.e
 
 const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => {
   setStatus(state, message);
-  if (state === 'running') loadHistory().then(() => {
-    if (!socket || socket.readyState === WebSocket.CLOSED) connectWebSocket();
-  });
+  // Connect WebSocket the first time the API becomes ready
+  if (state === 'ready' || state === 'voice-active') {
+    if (!socket || socket.readyState === WebSocket.CLOSED) {
+      loadHistory().then(() => connectWebSocket());
+    }
+  }
 });
 const cleanupVoice = window.electronAPI.onVoiceState(({ state }) => setVoiceState(state));
 window.addEventListener('beforeunload', () => { cleanupStatus(); cleanupVoice(); });
 
-// Initial state
-setStatus('stopped');
+// Initial state — API is auto-starting in the background
+setStatus('initializing');
 
 </script>
 </body>

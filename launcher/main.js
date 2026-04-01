@@ -1,6 +1,12 @@
 /**
  * main.js — Electron main process.
  * Manages the window, system tray, and FastAPI + voice subprocesses.
+ *
+ * Lifecycle:
+ *   App opens → API starts automatically → text chat enabled ("ready")
+ *   Start button → voice wake-word service starts ("voice-active")
+ *   Stop button  → voice service stops, text chat stays enabled ("ready")
+ *   Quit         → both subprocesses killed
  */
 
 const { app, BrowserWindow, ipcMain, nativeImage, Tray, Menu } = require('electron')
@@ -20,7 +26,7 @@ let mainWindow   = null
 let tray         = null
 let apiProcess   = null
 let voiceProcess = null
-let isStarting   = false
+let isVoiceStarting = false
 
 // ── Window ────────────────────────────────────────────────────────────────────
 function createWindow() {
@@ -42,8 +48,6 @@ function createWindow() {
 
 // ── Tray ──────────────────────────────────────────────────────────────────────
 function makeTrayIcon() {
-  // Build a 16x16 blue (#3b82f6 = rgb 59,130,246) icon from raw RGBA bytes.
-  // Avoids relying on a PNG file being valid — nativeImage handles encoding.
   const size = 16
   const buf  = Buffer.alloc(size * size * 4)
   for (let i = 0; i < size * size; i++) {
@@ -59,7 +63,7 @@ function createTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Show', click: () => mainWindow?.show() },
     { type: 'separator' },
-    { label: 'Quit', click: () => { app.isQuiting = true; stopServices(); app.quit() } },
+    { label: 'Quit', click: () => { app.isQuiting = true; stopAll(); app.quit() } },
   ]))
   tray.on('double-click', () => mainWindow?.show())
 }
@@ -82,41 +86,44 @@ function pollHealth(maxAttempts = 15) {
   })
 }
 
-// ── Service lifecycle ─────────────────────────────────────────────────────────
-async function startServices() {
-  if (isStarting) return
-  isStarting = true
-  try {
-    if (apiProcess)   { apiProcess.kill();   apiProcess   = null }
-    if (voiceProcess) { voiceProcess.kill(); voiceProcess = null }
+// ── API lifecycle (automatic) ─────────────────────────────────────────────────
+async function startApi() {
+  mainWindow?.webContents.send('status-update', { state: 'initializing' })
 
-    mainWindow?.webContents.send('status-update', { state: 'starting' })
-
-    const proc = spawn('python', [apiScript], {
-      env: { ...process.env },
-      stdio: ['ignore', 'ignore', 'pipe'],
-    })
-    apiProcess = proc
-    proc.stderr.on('data', (d) => process.stderr.write(`[API] ${d}`))
-    proc.on('error', (err) => {
-      if (apiProcess === proc) {
-        mainWindow?.webContents.send('status-update', { state: 'error', message: `Failed to start API: ${err.message}` })
-        apiProcess = null
-      }
-    })
-    proc.on('exit', (code) => {
-      if (code !== 0 && code !== null && apiProcess === proc) {
-        mainWindow?.webContents.send('status-update', { state: 'error', message: `API exited (${code})` })
-        apiProcess = null
-      }
-    })
-
-    try { await pollHealth() }
-    catch (err) {
-      apiProcess?.kill(); apiProcess = null
-      mainWindow?.webContents.send('status-update', { state: 'error', message: err.message })
-      throw err
+  const proc = spawn('python', [apiScript], {
+    env: { ...process.env },
+    stdio: ['ignore', 'ignore', 'pipe'],
+  })
+  apiProcess = proc
+  proc.stderr.on('data', (d) => process.stderr.write(`[API] ${d}`))
+  proc.on('error', (err) => {
+    if (apiProcess === proc) {
+      mainWindow?.webContents.send('status-update', { state: 'error', message: `Failed to start API: ${err.message}` })
+      apiProcess = null
     }
+  })
+  proc.on('exit', (code) => {
+    if (code !== 0 && code !== null && apiProcess === proc) {
+      mainWindow?.webContents.send('status-update', { state: 'error', message: `API exited (${code})` })
+      apiProcess = null
+    }
+  })
+
+  try {
+    await pollHealth()
+    mainWindow?.webContents.send('status-update', { state: 'ready' })
+  } catch (err) {
+    apiProcess?.kill(); apiProcess = null
+    mainWindow?.webContents.send('status-update', { state: 'error', message: err.message })
+  }
+}
+
+// ── Voice lifecycle (user-controlled) ────────────────────────────────────────
+async function startVoice() {
+  if (isVoiceStarting || voiceProcess) return
+  isVoiceStarting = true
+  try {
+    if (voiceProcess) { voiceProcess.kill(); voiceProcess = null }
 
     const vproc = spawn('python', [voiceScript, '--no-preload'], {
       env: { ...process.env },
@@ -133,7 +140,7 @@ async function startServices() {
     })
     vproc.on('error', (err) => {
       if (voiceProcess === vproc) {
-        mainWindow?.webContents.send('status-update', { state: 'error', message: `Failed to start voice: ${err.message}` })
+        mainWindow?.webContents.send('voice-state-update', { state: 'error' })
         voiceProcess = null
       }
     })
@@ -144,30 +151,39 @@ async function startServices() {
       }
     })
 
-    mainWindow?.webContents.send('status-update', { state: 'running' })
+    mainWindow?.webContents.send('status-update', { state: 'voice-active' })
   } finally {
-    isStarting = false
+    isVoiceStarting = false
   }
 }
 
-function stopServices() {
+function stopVoice() {
+  if (voiceProcess) { voiceProcess.kill(); voiceProcess = null }
+  mainWindow?.webContents.send('status-update', { state: 'ready' })
+}
+
+function stopAll() {
   if (voiceProcess) { voiceProcess.kill(); voiceProcess = null }
   if (apiProcess)   { apiProcess.kill();   apiProcess   = null }
-  mainWindow?.webContents.send('status-update', { state: 'stopped' })
 }
 
 // ── IPC ───────────────────────────────────────────────────────────────────────
 function registerIPC() {
   ipcMain.handle('start-services',  async () => {
-    try { await startServices(); return { ok: true } }
+    try { await startVoice(); return { ok: true } }
     catch (err) { return { ok: false, error: err.message } }
   })
-  ipcMain.handle('stop-services',  () => { stopServices(); return { ok: true } })
+  ipcMain.handle('stop-services',   () => { stopVoice(); return { ok: true } })
   ipcMain.handle('minimize-window', () => mainWindow?.minimize())
-  ipcMain.handle('close-window',    () => mainWindow?.close())  // triggers hide-to-tray handler
+  ipcMain.handle('close-window',    () => mainWindow?.close())
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
-app.whenReady().then(() => { createWindow(); createTray(); registerIPC() })
-app.on('before-quit', () => stopServices())
+app.whenReady().then(() => {
+  createWindow()
+  createTray()
+  registerIPC()
+  startApi()   // API starts automatically — no user action needed
+})
+app.on('before-quit', () => stopAll())
 app.on('window-all-closed', (e) => e.preventDefault())
