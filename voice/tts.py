@@ -39,9 +39,10 @@ logger = logging.getLogger(__name__)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-EDGE_VOICE: str  = os.getenv("EDGE_VOICE",  "en-US-GuyNeural")
+EDGE_VOICE: str  = os.getenv("EDGE_VOICE",  "en-GB-RyanNeural")
 EDGE_RATE: str   = os.getenv("EDGE_RATE",   "+0%")
 EDGE_VOLUME: str = os.getenv("EDGE_VOLUME", "+0%")
+EDGE_PITCH: str  = os.getenv("EDGE_PITCH",  "-10Hz")  # negative = deeper; sweet spot: -5Hz to -15Hz
 
 # ── Text preprocessing ────────────────────────────────────────────────────────
 
@@ -104,7 +105,7 @@ def stop_speaking() -> None:
 
 async def _generate_mp3(text: str) -> bytes:
     """Stream audio from edge-tts and return the full MP3 bytes."""
-    communicate = edge_tts.Communicate(text, voice=EDGE_VOICE, rate=EDGE_RATE, volume=EDGE_VOLUME)
+    communicate = edge_tts.Communicate(text, voice=EDGE_VOICE, rate=EDGE_RATE, volume=EDGE_VOLUME, pitch=EDGE_PITCH)
     buf = io.BytesIO()
     async for chunk in communicate.stream():
         if chunk["type"] == "audio":
@@ -180,4 +181,4 @@ def preload() -> None:
     This function exists so main.py can call it unconditionally without
     needing to know which TTS engine is in use.
     """
-    logger.info("Edge TTS ready (voice=%s, rate=%s)", EDGE_VOICE, EDGE_RATE)
+    logger.info("Edge TTS ready (voice=%s, rate=%s, pitch=%s)", EDGE_VOICE, EDGE_RATE, EDGE_PITCH)
