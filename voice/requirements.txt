@@ -8,7 +8,7 @@
 # Picovoice Porcupine — always-on, low-CPU wake word engine
 # Requires a free Picovoice account and a .ppn model file for "Hey Charles"
 # Sign up at: https://console.picovoice.ai/
-pvporcupine==3.0.0
+pvporcupine==4.0.0
 
 # ── Speech-to-text ───────────────────────────────────────────────────────────
 # OpenAI Whisper — local, offline transcription (no data leaves the machine)
