@@ -130,6 +130,7 @@ async function startVoice() {
       stdio: ['ignore', 'pipe', 'pipe'],
     })
     voiceProcess = vproc
+    vproc.stderr.on('data', (d) => process.stderr.write(`[Voice] ${d}`))
     vproc.stdout.on('data', (d) => {
       for (const line of d.toString().split('\n')) {
         const t = line.trim()
