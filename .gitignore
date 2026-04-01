@@ -148,3 +148,29 @@ vite.config.ts.timestamp-*
 
 # Claude Code project context (personal notes, not for git)
 CLAUDE.md
+.claude/
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# ── Voice service — auto-downloaded assets ────────────────────────────────────
+# Piper binary (downloaded per-platform at runtime by tts.py)
+voice/bin/*
+!voice/bin/.gitkeep
+
+# Piper model files (large binaries, downloaded at runtime)
+voice/models/*.onnx
+voice/models/*.onnx.json
+
+# Porcupine wake word models — .ppn files ARE committed (platform-specific binaries).
+# Windows: Hey-Charles_en_windows_v4_0_0.ppn + charles_en_windows_v4_0_0.ppn
+# macOS/Linux teammates: regenerate from https://console.picovoice.ai for your platform.
+
+# Whisper model cache lives in ~/.cache/whisper (outside the repo)

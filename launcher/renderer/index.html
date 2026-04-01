@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Charles</title>
+  <script src="lib/marked.min.js"></script>
+  <script src="lib/purify.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #0d0d0d;
+      --surface:    #1a1a1a;
+      --border:     #2a2a2a;
+      --text:       #e8e8e8;
+      --text-muted: #888;
+      --user-bg:    #1e2d40;
+      --user-border:#2a4a6e;
+      --assist-bg:  #1a1a1a;
+      --accent:     #3b82f6;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      -webkit-app-region: drag;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: .03em; }
+    #ws-status {
+      font-size: .75rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #1f2937;
+      color: var(--text-muted);
+    }
+    #ws-status.connected    { background: #14532d; color: #4ade80; }
+    #ws-status.disconnected { background: #450a0a; color: #f87171; }
+
+    /* ── Message list ── */
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .turn { display: flex; flex-direction: column; gap: 0; }
+
+    .bubble {
+      max-width: min(680px, 90%);
+      padding: 12px 16px;
+      border-radius: 12px;
+      line-height: 1.6;
+      font-size: .9rem;
+      word-break: break-word;
+    }
+    .bubble.user {
+      align-self: flex-end;
+      margin-right: 20px;
+      background: var(--user-bg);
+      border: 1px solid var(--user-border);
+      border-bottom-right-radius: 4px;
+    }
+    .bubble.assistant {
+      align-self: flex-start;
+      margin-left: 20px;
+      background: var(--assist-bg);
+      border: 1px solid var(--border);
+      border-bottom-left-radius: 4px;
+    }
+
+    /* voice-origin badge on assistant bubbles */
+    .bubble.assistant.from-voice::before {
+      content: "voice";
+      display: inline-block;
+      font-size: .7rem;
+      color: #a78bfa;
+      background: #2e1065;
+      border-radius: 999px;
+      padding: 1px 7px;
+      margin-bottom: 6px;
+    }
+
+    /* markdown inside bubbles */
+    .bubble p  { margin-bottom: .6em; }
+    .bubble p:last-child { margin-bottom: 0; }
+    .bubble code {
+      font-family: "SF Mono", "Consolas", monospace;
+      font-size: .82em;
+      background: #111;
+      border-radius: 4px;
+      padding: 1px 5px;
+    }
+    .bubble pre {
+      background: #111;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      overflow-x: auto;
+      margin: .5em 0;
+    }
+    .bubble pre code { background: none; padding: 0; }
+    .bubble ul, .bubble ol { padding-left: 1.4em; }
+
+    /* thinking indicator */
+    .thinking {
+      align-self: flex-start;
+      margin-left: 20px;
+      color: var(--text-muted);
+      font-size: .85rem;
+      font-style: italic;
+      padding: 8px 4px;
+    }
+    .thinking span { animation: blink 1.2s step-start infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── Input bar ── */
+    #input-bar {
+      display: flex;
+      gap: 8px;
+      padding: 14px 20px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #msg-input {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: .9rem;
+      padding: 10px 14px;
+      resize: none;
+      line-height: 1.5;
+      max-height: 140px;
+      outline: none;
+      font-family: inherit;
+    }
+    #msg-input:focus { border-color: var(--accent); }
+    #send-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 0 18px;
+      font-size: .9rem;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+      align-self: flex-end;
+      height: 42px;
+    }
+    #send-btn:hover   { background: #2563eb; }
+    #send-btn:disabled { background: #374151; cursor: not-allowed; }
+
+    /* scrollbar */
+    #messages::-webkit-scrollbar { width: 6px; }
+    #messages::-webkit-scrollbar-track { background: transparent; }
+    #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    #top-bar {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
+      flex-shrink: 0; background: #111;
+    }
+
+    .status-dot { width:8px; height:8px; border-radius:50%; background:#555; flex-shrink:0; }
+    .status-dot.initializing { background: #f59e0b; }
+    .status-dot.ready        { background: var(--accent); }
+    .status-dot.voice-active { background: var(--accent); }
+    .status-dot.error        { background: #ef4444; }
+
+    #status-label { font-size:.8rem; color:var(--text-muted); flex:1; }
+
+    #voice-pill { font-size:.72rem; padding:2px 8px; border-radius:999px; display:none; }
+    #voice-pill.listening    { display:inline; background:#2e1065; color:#a78bfa; }
+    #voice-pill.transcribing { display:inline; background:#1f2937; color:#9ca3af; }
+    #voice-pill.speaking     { display:inline; background:#431407; color:#fb923c; }
+    #voice-pill.error        { display:inline; background:#1f2937; color:#9ca3af; }
+
+    #start-btn { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:5px 14px; font-size:.8rem; font-weight:600; cursor:pointer; }
+    #start-btn:hover:not(:disabled) { background:#1d4ed8; }
+    #start-btn:disabled { background:#374151; color:#6b7280; cursor:not-allowed; }
+    #stop-btn  { background:#7f1d1d; color:#fca5a5; border:none; border-radius:8px; padding:5px 14px; font-size:.8rem; font-weight:600; cursor:pointer; }
+    #stop-btn:hover { background:#991b1b; }
+    #msg-input:disabled { opacity:.4; cursor:not-allowed; }
+
+    .win-controls { margin-left:auto; display:flex; gap:4px; -webkit-app-region:no-drag; }
+    .win-controls button {
+      width:28px; height:22px; border:none; border-radius:4px;
+      background:#2a2a2a; color:var(--text-muted); font-size:.8rem;
+      cursor:pointer; display:flex; align-items:center; justify-content:center;
+    }
+    .win-controls button:hover { background:#3a3a3a; color:var(--text); }
+    #btn-close:hover { background:#7f1d1d; color:#fca5a5; }
+    </style>
+</head>
+<body>
+
+<header>
+  <h1>Charles</h1>
+  <span id="ws-status">connecting…</span>
+</header>
+
+<div id="top-bar">
+  <div class="status-dot" id="status-dot"></div>
+  <span id="status-label">Stopped</span>
+  <span id="voice-pill"></span>
+  <button id="start-btn">Start</button>
+  <button id="stop-btn" style="display:none">Stop</button>
+  <div class="win-controls">
+    <button id="btn-minimize" title="Minimize">&#8722;</button>
+    <button id="btn-close"    title="Close">&#x2715;</button>
+  </div>
+</div>
+
+<div id="messages"></div>
+
+<div id="input-bar">
+  <textarea id="msg-input" rows="1" placeholder="Message Charles…"></textarea>
+  <button id="send-btn">Send</button>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const API_BASE = 'http://localhost:8000';
+const WS_URL   = 'ws://localhost:8000/ws';
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let conversationId      = null;   // set after first turn or history load
+let pendingTurn         = null;   // DOM node for the "thinking…" indicator
+let pendingVoiceWrapper = null;   // .turn wrapper rendered immediately on voice transcript
+let socket              = null;
+
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const $messages = document.getElementById("messages");
+const $input    = document.getElementById("msg-input");
+const $sendBtn  = document.getElementById("send-btn");
+const $wsStatus = document.getElementById("ws-status");
+
+// ── Marked config ─────────────────────────────────────────────────────────────
+marked.setOptions({ breaks: true, gfm: true });
+
+/** Render markdown → sanitized HTML string. */
+function md(content) {
+  return DOMPurify.sanitize(marked.parse(content));
+}
+
+// ── Render helpers ────────────────────────────────────────────────────────────
+
+/**
+ * renderTurn — render a user+assistant pair.
+ * Called both from WS "turn" events and when replaying history on load.
+ *
+ * @param {{ interface: string, user: {content:string}, assistant: {content:string} }} turn
+ */
+function renderTurn(turn) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "turn";
+
+  const userBubble = document.createElement("div");
+  userBubble.className = "bubble user";
+  userBubble.textContent = turn.user.content;  // plain text — no XSS risk
+
+  const assistBubble = document.createElement("div");
+  assistBubble.className = "bubble assistant" + (turn.interface === "voice" ? " from-voice" : "");
+  assistBubble.innerHTML = md(turn.assistant.content);  // sanitized markdown
+
+  wrapper.appendChild(userBubble);
+  wrapper.appendChild(assistBubble);
+  $messages.appendChild(wrapper);
+  scrollToBottom();
+}
+
+function showThinking() {
+  pendingTurn = document.createElement("div");
+  pendingTurn.className = "thinking";
+  const label = document.createTextNode("Charles is thinking");
+  const dots  = document.createElement("span");
+  dots.textContent = "…";
+  pendingTurn.appendChild(label);
+  pendingTurn.appendChild(dots);
+  $messages.appendChild(pendingTurn);
+  scrollToBottom();
+}
+
+function clearThinking() {
+  if (pendingTurn) { pendingTurn.remove(); pendingTurn = null; }
+}
+
+/** Render a standalone error/info bubble (assistant style). */
+function renderInfo(text) {
+  const el = document.createElement("div");
+  el.className = "bubble assistant";
+  el.textContent = text;
+  $messages.appendChild(el);
+  scrollToBottom();
+}
+
+/**
+ * showVoiceTranscript — render the user bubble immediately after Whisper
+ * transcribes, before the AI reply arrives.  Stores a reference to the
+ * wrapper so the WS handler can append the assistant bubble to it later
+ * instead of calling renderTurn (which would double-render the user text).
+ */
+function showVoiceTranscript(text) {
+  pendingVoiceWrapper = document.createElement("div");
+  pendingVoiceWrapper.className = "turn";
+
+  const userBubble = document.createElement("div");
+  userBubble.className = "bubble user";
+  userBubble.textContent = text;
+
+  pendingVoiceWrapper.appendChild(userBubble);
+  $messages.appendChild(pendingVoiceWrapper);
+  scrollToBottom();
+  showThinking();
+}
+
+function scrollToBottom() {
+  $messages.scrollTop = $messages.scrollHeight;
+}
+
+// ── History load ──────────────────────────────────────────────────────────────
+async function loadHistory() {
+  try {
+    const res = await fetch(`${API_BASE}/history/shared`);
+    if (res.status === 404) return;   // no conversation yet — empty state
+    if (!res.ok) return;
+
+    const data = await res.json();
+    conversationId = data.conversation_id;
+
+    // Group messages into user/assistant pairs for rendering
+    const msgs = data.messages;
+    for (let i = 0; i < msgs.length; i++) {
+      if (msgs[i].role === "user" && msgs[i + 1]?.role === "assistant") {
+        renderTurn({
+          interface: "web",
+          user:      { content: msgs[i].content },
+          assistant: { content: msgs[i + 1].content },
+        });
+        i++;  // skip the assistant message we just consumed
+      }
+    }
+  } catch (e) {
+    console.warn("Could not load history:", e);
+  }
+}
+
+// ── WebSocket ─────────────────────────────────────────────────────────────────
+
+/**
+ * connectWebSocket — connect to /ws with exponential-backoff reconnection.
+ *
+ * @param {number} attempt  - current attempt index (0 = first connect)
+ */
+function connectWebSocket(attempt = 0) {
+  socket = new WebSocket(WS_URL);
+
+  socket.onopen = () => {
+    $wsStatus.textContent = "connected";
+    $wsStatus.className   = "connected";
+  };
+
+  socket.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.type !== "turn") return;
+    if (!conversationId) conversationId = msg.conversation_id;
+    clearThinking();
+
+    if (pendingVoiceWrapper && msg.interface === "voice") {
+      // User bubble was already rendered by showVoiceTranscript — only add
+      // the assistant bubble into the same wrapper to keep DOM structure intact.
+      // md() sanitizes via DOMPurify before setting innerHTML (same as renderTurn).
+      const assistBubble = document.createElement("div");
+      assistBubble.className = "bubble assistant from-voice";
+      assistBubble.innerHTML = md(msg.assistant.content); // md() = DOMPurify.sanitize(marked.parse(...))
+      pendingVoiceWrapper.appendChild(assistBubble);
+      pendingVoiceWrapper = null;
+      scrollToBottom();
+    } else {
+      renderTurn(msg);
+    }
+  };
+
+  socket.onclose = () => {
+    $wsStatus.textContent = "disconnected";
+    $wsStatus.className   = "disconnected";
+
+    // TODO: your turn — implement reconnection here.
+    //
+    // Hints:
+    //   - setTimeout(() => connectWebSocket(attempt + 1), delayMs)
+    //   - Exponential backoff: Math.min(1000 * 2 ** attempt, 30_000)
+    //   - Give up after e.g. 10 attempts and leave status as "disconnected"
+  };
+
+  socket.onerror = () => {
+    $wsStatus.textContent = "error";
+    $wsStatus.className   = "disconnected";
+  };
+}
+
+// ── Send message ──────────────────────────────────────────────────────────────
+async function sendMessage() {
+  const text = $input.value.trim();
+  if (!text) return;
+
+  $input.value = "";
+  $input.style.height = "auto";
+  $sendBtn.disabled = true;
+  showThinking();
+
+  try {
+    const body = { message: text, interface: "web" };
+    if (conversationId) body.conversation_id = conversationId;
+
+    const res = await fetch(`${API_BASE}/chat`, {
+      method:  "POST",
+      headers: { "Content-Type": "application/json" },
+      body:    JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      clearThinking();
+      const err = await res.json().catch(() => ({ detail: "Unknown error" }));
+      renderInfo(`Error ${res.status}: ${err.detail ?? "Unknown error"}`);
+    }
+    // On success the WS broadcast renders the turn — nothing more to do here.
+  } catch (e) {
+    clearThinking();
+    renderInfo(`Could not reach Charles API: ${e.message}`);
+  } finally {
+    $sendBtn.disabled = false;
+    $input.focus();
+  }
+}
+
+// ── Input events ──────────────────────────────────────────────────────────────
+$sendBtn.addEventListener("click", sendMessage);
+
+$input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+$input.addEventListener("input", () => {
+  $input.style.height = "auto";
+  $input.style.height = Math.min($input.scrollHeight, 140) + "px";
+});
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+(async () => {
+  $input.focus();
+})();
+// Top bar DOM refs
+const $startBtn  = document.getElementById('start-btn');
+const $stopBtn   = document.getElementById('stop-btn');
+const $dot       = document.getElementById('status-dot');
+const $label     = document.getElementById('status-label');
+const $voicePill = document.getElementById('voice-pill');
+
+function setStatus(state, message) {
+  $dot.className = `status-dot ${state}`;
+  $label.textContent = {
+    initializing: 'Starting…',
+    ready:         'Ready',
+    'voice-active':'Voice Active',
+    error:          message || 'Error',
+  }[state] ?? state;
+
+  const isReady       = state === 'ready' || state === 'voice-active';
+  const isVoiceActive = state === 'voice-active';
+
+  $startBtn.style.display = state === 'ready'   ? 'inline' : 'none';
+  $stopBtn.style.display  = isVoiceActive        ? 'inline' : 'none';
+  $input.disabled         = !isReady;
+  $sendBtn.disabled       = !isReady;
+  $input.placeholder      = isReady ? 'Message Charles…' : 'Charles is starting…';
+  if (!isVoiceActive) { $voicePill.className = ''; $voicePill.textContent = ''; }
+}
+
+function setVoiceState(state) {
+  const labels = { listening:'🎙 Listening', transcribing:'📝 Transcribing…', speaking:'🔊 Speaking', error:'Voice offline' };
+  $voicePill.className   = state;
+  $voicePill.textContent = labels[state] ?? '';
+}
+
+// IPC wiring — service controls
+$startBtn.addEventListener('click', () => window.electronAPI.start());
+$stopBtn.addEventListener('click',  () => window.electronAPI.stop());
+
+// Window chrome controls (frameless window has no native buttons)
+document.getElementById('btn-minimize').addEventListener('click', () => window.electronAPI.minimize());
+document.getElementById('btn-close').addEventListener('click',    () => window.electronAPI.closeWindow());
+
+const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => {
+  setStatus(state, message);
+  // Connect WebSocket the first time the API becomes ready
+  if (state === 'ready' || state === 'voice-active') {
+    if (!socket || socket.readyState === WebSocket.CLOSED) {
+      loadHistory().then(() => connectWebSocket());
+    }
+  }
+});
+const cleanupVoice      = window.electronAPI.onVoiceState(({ state }) => setVoiceState(state));
+const cleanupTranscript = window.electronAPI.onVoiceTranscript(({ text }) => showVoiceTranscript(text));
+window.addEventListener('beforeunload', () => { cleanupStatus(); cleanupVoice(); cleanupTranscript(); });
+
+// Initial state — API is auto-starting in the background
+setStatus('initializing');
+
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+# Voice Service — Python Dependencies
+# Install with: pip install -r requirements.txt
+#
+# Requires Python 3.10+
+# Tested on Windows (WASAPI), macOS (CoreAudio), Linux (ALSA/PulseAudio)
+
+# ── Wake word detection ──────────────────────────────────────────────────────
+# Picovoice Porcupine — always-on, low-CPU wake word engine
+# Requires a free Picovoice account and a .ppn model file for "Hey Charles"
+# Sign up at: https://console.picovoice.ai/
+pvporcupine==4.0.0
+
+# ── Speech-to-text ───────────────────────────────────────────────────────────
+# OpenAI Whisper — local, offline transcription (no data leaves the machine)
+# Model auto-downloads on first run (~140 MB for 'base', ~460 MB for 'small')
+openai-whisper==20250625
+
+# Whisper hard dependencies
+numpy>=1.24.0
+torch>=2.1.0          # CPU-only is fine; GPU speeds up transcription significantly
+torchaudio>=2.1.0     # Audio I/O backend used by Whisper
+
+# ── Audio I/O ────────────────────────────────────────────────────────────────
+# PyAudio — microphone capture and speaker playback
+# Windows: bundled PortAudio wheels via pipwin if needed
+# Linux:   sudo apt-get install portaudio19-dev python3-pyaudio
+# macOS:   brew install portaudio
+pyaudio==0.2.14
+
+# ── Text-to-speech ───────────────────────────────────────────────────────────
+# Piper TTS — local, offline neural TTS (used as an external binary subprocess)
+# The piper-tts PyPI package is NOT listed here — its piper-phonemize dependency
+# has no Python 3.12+ wheels.  Instead, tts.py auto-downloads the piper binary
+# from https://github.com/rhasspy/piper/releases and calls it via subprocess.
+# Voice ONNX models are also auto-downloaded from HuggingFace on first run.
+# See voice/README.md for manual installation instructions.
+
+# ── HTTP client (talk to Charles API) ───────────────────────────────────────
+requests==2.31.0
+
+# ── Configuration ────────────────────────────────────────────────────────────
+python-dotenv==1.0.0
