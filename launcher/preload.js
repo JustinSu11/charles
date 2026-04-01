@@ -15,4 +15,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('voice-state-update', listener)
     return () => ipcRenderer.removeListener('voice-state-update', listener)
   },
+  onVoiceTranscript: (cb) => {
+    const listener = (_e, d) => cb(d)
+    ipcRenderer.on('voice-transcript', listener)
+    return () => ipcRenderer.removeListener('voice-transcript', listener)
+  },
 })

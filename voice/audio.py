@@ -178,6 +178,7 @@ def record_until_silence(
     silence_threshold: float = DEFAULT_SILENCE_THRESHOLD,
     silence_duration: float = DEFAULT_SILENCE_DURATION,
     max_duration: float = DEFAULT_MAX_RECORD_SECONDS,
+    pre_speech_timeout: Optional[float] = None,
 ) -> np.ndarray:
     """
     Record audio from the microphone until the user stops speaking.
@@ -198,6 +199,10 @@ def record_until_silence(
         Seconds of continuous silence that signals end-of-speech (default 1.5).
     max_duration
         Hard upper limit in seconds before recording stops regardless (default 30).
+    pre_speech_timeout
+        If set, give up and return an empty array if no speech above
+        *silence_threshold* is detected within this many seconds.  Useful
+        for conversation mode: exit the loop if the user doesn't respond.
     """
     pa = pyaudio.PyAudio()
     kwargs: dict = dict(
@@ -215,22 +220,32 @@ def record_until_silence(
 
     frames: list[bytes] = []
     silent_chunks = 0
+    speech_started = False
     silence_chunk_limit = int(silence_duration * SAMPLE_RATE / CHUNK)
     max_chunks = int(max_duration * SAMPLE_RATE / CHUNK)
+    pre_speech_chunk_limit = (
+        int(pre_speech_timeout * SAMPLE_RATE / CHUNK) if pre_speech_timeout is not None else None
+    )
 
     logger.info("Recording… (silence threshold=%.0f, max=%.0fs)", silence_threshold, max_duration)
 
     try:
-        for _ in range(max_chunks):
+        for chunk_index in range(max_chunks):
             frame = stream.read(CHUNK, exception_on_overflow=False)
             frames.append(frame)
-            if _rms(frame) < silence_threshold:
+            if _rms(frame) >= silence_threshold:
+                speech_started = True
+                silent_chunks = 0
+            else:
+                # Pre-speech timeout: give up if user hasn't spoken yet
+                if not speech_started and pre_speech_chunk_limit is not None:
+                    if chunk_index >= pre_speech_chunk_limit:
+                        logger.debug("Pre-speech timeout — no speech detected, exiting")
+                        return np.zeros(0, dtype=np.float32)
                 silent_chunks += 1
-                if silent_chunks >= silence_chunk_limit:
+                if speech_started and silent_chunks >= silence_chunk_limit:
                     logger.debug("Silence detected — stopping recording")
                     break
-            else:
-                silent_chunks = 0
     finally:
         stream.stop_stream()
         stream.close()

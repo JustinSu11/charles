@@ -245,9 +245,10 @@ const API_BASE = 'http://localhost:8000';
 const WS_URL   = 'ws://localhost:8000/ws';
 
 // ── State ─────────────────────────────────────────────────────────────────────
-let conversationId = null;   // set after first turn or history load
-let pendingTurn    = null;   // DOM node for the "thinking…" indicator
-let socket         = null;
+let conversationId      = null;   // set after first turn or history load
+let pendingTurn         = null;   // DOM node for the "thinking…" indicator
+let pendingVoiceWrapper = null;   // .turn wrapper rendered immediately on voice transcript
+let socket              = null;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
 const $messages = document.getElementById("messages");
@@ -314,6 +315,26 @@ function renderInfo(text) {
   scrollToBottom();
 }
 
+/**
+ * showVoiceTranscript — render the user bubble immediately after Whisper
+ * transcribes, before the AI reply arrives.  Stores a reference to the
+ * wrapper so the WS handler can append the assistant bubble to it later
+ * instead of calling renderTurn (which would double-render the user text).
+ */
+function showVoiceTranscript(text) {
+  pendingVoiceWrapper = document.createElement("div");
+  pendingVoiceWrapper.className = "turn";
+
+  const userBubble = document.createElement("div");
+  userBubble.className = "bubble user";
+  userBubble.textContent = text;
+
+  pendingVoiceWrapper.appendChild(userBubble);
+  $messages.appendChild(pendingVoiceWrapper);
+  scrollToBottom();
+  showThinking();
+}
+
 function scrollToBottom() {
   $messages.scrollTop = $messages.scrollHeight;
 }
@@ -365,7 +386,20 @@ function connectWebSocket(attempt = 0) {
     if (msg.type !== "turn") return;
     if (!conversationId) conversationId = msg.conversation_id;
     clearThinking();
-    renderTurn(msg);
+
+    if (pendingVoiceWrapper && msg.interface === "voice") {
+      // User bubble was already rendered by showVoiceTranscript — only add
+      // the assistant bubble into the same wrapper to keep DOM structure intact.
+      // md() sanitizes via DOMPurify before setting innerHTML (same as renderTurn).
+      const assistBubble = document.createElement("div");
+      assistBubble.className = "bubble assistant from-voice";
+      assistBubble.innerHTML = md(msg.assistant.content); // md() = DOMPurify.sanitize(marked.parse(...))
+      pendingVoiceWrapper.appendChild(assistBubble);
+      pendingVoiceWrapper = null;
+      scrollToBottom();
+    } else {
+      renderTurn(msg);
+    }
   };
 
   socket.onclose = () => {
@@ -490,8 +524,9 @@ const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => 
     }
   }
 });
-const cleanupVoice = window.electronAPI.onVoiceState(({ state }) => setVoiceState(state));
-window.addEventListener('beforeunload', () => { cleanupStatus(); cleanupVoice(); });
+const cleanupVoice      = window.electronAPI.onVoiceState(({ state }) => setVoiceState(state));
+const cleanupTranscript = window.electronAPI.onVoiceTranscript(({ text }) => showVoiceTranscript(text));
+window.addEventListener('beforeunload', () => { cleanupStatus(); cleanupVoice(); cleanupTranscript(); });
 
 // Initial state — API is auto-starting in the background
 setStatus('initializing');

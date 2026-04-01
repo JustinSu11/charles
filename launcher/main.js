@@ -136,6 +136,9 @@ async function startVoice() {
         const t = line.trim()
         if (t.startsWith('VOICE_STATE:')) {
           mainWindow?.webContents.send('voice-state-update', { state: t.replace('VOICE_STATE:', '').toLowerCase() })
+        } else if (t.startsWith('VOICE_TRANSCRIPT:')) {
+          const text = t.slice('VOICE_TRANSCRIPT:'.length)
+          mainWindow?.webContents.send('voice-transcript', { text })
         }
       }
     })

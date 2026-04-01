@@ -70,6 +70,90 @@ def _ack_phrase() -> str:
     return phrase
 
 
+# ── Stop phrases — saying any of these ends the conversation ─────────────────
+
+_STOP_PHRASES = frozenset((
+    "goodbye", "bye", "stop", "that's all", "stop listening",
+    "never mind", "exit", "go away",
+))
+
+# Seconds to wait for speech after Charles stops speaking.
+# If the user is quiet for this long, the conversation ends and the
+# service returns to wake word mode.
+_CONVERSATION_TIMEOUT_S: float = float(os.getenv("CONVERSATION_TIMEOUT_S", "8"))
+
+
+# ── Single interaction turn ───────────────────────────────────────────────────
+
+def _one_turn(
+    input_device_index: Optional[int],
+    output_device_index: Optional[int],
+    pre_speech_timeout: Optional[float] = None,
+) -> str:
+    """
+    Execute one listen → transcribe → respond cycle.
+
+    Parameters
+    ----------
+    pre_speech_timeout
+        Passed to ``audio.record_until_silence``.  None means "wait as long
+        as needed" (used for the first turn right after wake word).  A positive
+        number means "give up if the user hasn't spoken within this many
+        seconds" (used for follow-up turns in conversation mode).
+
+    Returns
+    -------
+    "continue"  — turn completed normally; stay in conversation mode.
+    "stop"      — user said a stop phrase; exit conversation mode.
+    "timeout"   — no speech detected; exit conversation mode silently.
+    """
+    print("VOICE_STATE:LISTENING", flush=True)
+    logger.info("Waiting for user to speak…")
+
+    audio_data = audio.record_until_silence(
+        input_device_index=input_device_index,
+        pre_speech_timeout=pre_speech_timeout,
+    )
+
+    if audio_data is None or len(audio_data) < 1600:
+        return "timeout"
+
+    print("VOICE_STATE:TRANSCRIBING", flush=True)
+    text = stt.transcribe(audio_data)
+
+    if not text:
+        logger.info("Transcription was empty")
+        tts.speak("Sorry, I didn't catch that.", output_device_index=output_device_index)
+        return "continue"
+
+    logger.info("User said: %r", text)
+    lower = text.lower().strip()
+
+    # Stop phrases — end the conversation
+    if any(k in lower for k in _STOP_PHRASES):
+        tts.speak("Goodbye!", output_device_index=output_device_index)
+        return "stop"
+
+    # Special local commands (no API round-trip needed)
+    if any(k in lower for k in ("new conversation", "start over", "reset", "forget that")):
+        api_client.reset_conversation()
+        tts.speak("Starting a new conversation.", output_device_index=output_device_index)
+        return "continue"
+
+    # Emit transcript immediately so the GUI can show it before the API responds
+    print(f"VOICE_TRANSCRIPT:{text}", flush=True)
+
+    # Send to Charles API
+    reply = api_client.send_message(text)
+
+    # Speak reply (interruptible via wake word — stop_speaking() is called
+    # by the wake word thread if the user says "Hey Charles" mid-reply)
+    print("VOICE_STATE:SPEAKING", flush=True)
+    tts.speak(reply, output_device_index=output_device_index)
+
+    return "continue"
+
+
 # ── Core interaction loop ─────────────────────────────────────────────────────
 
 def handle_wake(
@@ -79,50 +163,44 @@ def handle_wake(
 ) -> None:
     """
     Called each time the wake word is detected.
-    Handles one full voice interaction turn.
-    """
 
-    # 1. Acknowledge
+    Handles the first turn then stays in conversation mode — the user
+    can keep talking without saying the wake word again.  The conversation
+    ends when:
+      • the user says a stop phrase ("goodbye", "stop", etc.)
+      • the user is silent for CONVERSATION_TIMEOUT_S seconds
+      • stop_event is set (voice service shutting down)
+    """
+    # Acknowledge
     ack = _ack_phrase()
     logger.info("Wake word detected — acknowledging: %r", ack)
     tts.speak(ack, output_device_index=output_device_index)
-    print("VOICE_STATE:LISTENING", flush=True)
 
-    # 2. Record until silence
-    logger.info("Waiting for user to speak…")
-    audio_data = audio.record_until_silence(input_device_index=input_device_index)
+    # First turn: no pre-speech timeout — user just triggered the wake word
+    result = _one_turn(input_device_index, output_device_index, pre_speech_timeout=None)
 
-    if audio_data is None or len(audio_data) < 1600:
-        logger.info("No speech detected — returning to wake word loop")
+    if result == "timeout":
         tts.speak("I didn't hear anything. Say 'Hey Charles' when you're ready.",
                   output_device_index=output_device_index)
         return
 
-    # 3. Transcribe
-    print("VOICE_STATE:TRANSCRIBING", flush=True)
-    text = stt.transcribe(audio_data)
-
-    if not text:
-        logger.info("Transcription was empty — returning to wake word loop")
-        tts.speak("Sorry, I didn't catch that.", output_device_index=output_device_index)
+    if result == "stop":
         return
 
-    logger.info("User said: %r", text)
+    # Conversation loop: stay active until silence timeout or stop phrase
+    logger.info("Entering conversation mode — listening for follow-up…")
+    while not stop_event.is_set():
+        result = _one_turn(
+            input_device_index,
+            output_device_index,
+            pre_speech_timeout=_CONVERSATION_TIMEOUT_S,
+        )
+        if result in ("stop", "timeout"):
+            if result == "timeout":
+                logger.info("Conversation timed out — returning to wake word mode")
+            break
 
-    # 4. Special local commands (no API round-trip needed)
-    lower = text.lower().strip()
-    if any(k in lower for k in ("new conversation", "start over", "reset", "forget that")):
-        api_client.reset_conversation()
-        tts.speak("Starting a new conversation.", output_device_index=output_device_index)
-        return
-
-    # 5. Send to Charles API
-    reply = api_client.send_message(text)
-
-    # 6. Speak reply (interruptible via wake word — stop_speaking() is called
-    #    by the wake word thread if the user says "Hey Charles" mid-reply)
-    print("VOICE_STATE:SPEAKING", flush=True)
-    tts.speak(reply, output_device_index=output_device_index)
+    logger.info("Conversation ended (reason: %s)", result)
 
 
 # ── Startup ───────────────────────────────────────────────────────────────────
