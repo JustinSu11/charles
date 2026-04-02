@@ -263,8 +263,51 @@ function _exchangeCodeForKey(code, verifier) {
 //     since this runs after Step 2), and adds a few seconds of wait time.
 //
 async function validatePicovoiceKey(picovoiceKey) {
-  // Replace this placeholder with your implementation
-  return { ok: true }
+  if (!picovoiceKey || !picovoiceKey.trim()) {
+    return { ok: false, error: 'Picovoice key cannot be empty.' }
+  }
+
+  return new Promise((resolve) => {
+    // Key is passed via environment variable — never injected into the script
+    // string — so quotes or special characters in the key can't break anything.
+    const script = [
+      'import pvporcupine, os',
+      'pv = pvporcupine.create(access_key=os.environ["PV_KEY"])',
+      'pv.delete()',
+    ].join('; ')
+
+    const proc = spawn('python', ['-c', script], {
+      stdio: ['ignore', 'ignore', 'pipe'],
+      env: { ...process.env, PV_KEY: picovoiceKey },
+    })
+
+    let stderr = ''
+    proc.stderr.on('data', d => { stderr += d })
+
+    // 10-second timeout — SDK init should be near-instant
+    const timer = setTimeout(() => {
+      proc.kill()
+      resolve({ ok: false, error: 'Validation timed out. Check your internet connection.' })
+    }, 10_000)
+
+    proc.on('exit', (code) => {
+      clearTimeout(timer)
+      if (code === 0) {
+        resolve({ ok: true })
+      } else {
+        // pvporcupine prints a descriptive error to stderr — surface it
+        const hint = stderr.includes('invalid') || stderr.includes('Invalid')
+          ? 'Key not recognised — double-check at console.picovoice.ai'
+          : 'Picovoice validation failed — check your key and internet connection.'
+        resolve({ ok: false, error: hint })
+      }
+    })
+
+    proc.on('error', () => {
+      clearTimeout(timer)
+      resolve({ ok: false, error: 'Could not run Python to validate key.' })
+    })
+  })
 }
 
 // ── Exports ───────────────────────────────────────────────────────────────────
