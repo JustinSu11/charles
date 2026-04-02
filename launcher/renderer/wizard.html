@@ -205,20 +205,30 @@
       <div id="install-log">Waiting to start…</div>
     </div>
 
-    <!-- Step 3: API Keys -->
+    <!-- Step 3: Connect accounts -->
     <div class="panel" id="panel-3">
-      <h2>API Keys</h2>
-      <p>These keys are saved only to your local <code>.env</code> file and never leave your machine.</p>
+      <h2>Connect Accounts</h2>
+      <p>Charles needs two things: an AI provider and a wake word licence. Both are free.</p>
+
+      <!-- OpenRouter OAuth -->
       <div class="field">
-        <label>OpenRouter API Key</label>
-        <input type="password" id="input-openrouter" placeholder="sk-or-v1-…" autocomplete="off" spellcheck="false" />
-        <span class="hint">Get one free at <a id="link-openrouter">openrouter.ai/keys</a></span>
+        <label>AI Provider — OpenRouter</label>
+        <div id="or-connect-row" style="display:flex; align-items:center; gap:10px;">
+          <button id="btn-oauth" style="background:var(--accent);color:#fff;border:none;border-radius:8px;padding:9px 18px;font-size:.88rem;font-weight:600;cursor:pointer;">
+            Connect with OpenRouter
+          </button>
+          <span id="or-status" style="font-size:.82rem; color:var(--text-muted);">Opens your browser</span>
+        </div>
+        <span class="hint">Sign in with Google or GitHub — no key to copy/paste</span>
       </div>
+
+      <!-- Picovoice key -->
       <div class="field">
-        <label>Picovoice Access Key</label>
+        <label>Wake Word Licence — Picovoice</label>
         <input type="password" id="input-picovoice" placeholder="Your Picovoice access key" autocomplete="off" spellcheck="false" />
-        <span class="hint">Get one free at <a id="link-picovoice">console.picovoice.ai</a></span>
+        <span class="hint">Free key at <a id="link-picovoice">console.picovoice.ai</a> — needed so the "Hey Charles" SDK can run</span>
       </div>
+
       <div class="key-status" id="key-status"></div>
     </div>
 
@@ -269,6 +279,7 @@ let current    = 0
 let passed     = [false, false, false, false, false]
 let installing = false
 let cleanupLog = null
+let oauthKey   = null   // OpenRouter key received from OAuth flow
 
 const $next     = document.getElementById('btn-next')
 const $back     = document.getElementById('btn-back')
@@ -331,6 +342,28 @@ async function runInstall() {
   markStep(2, r.ok)
 }
 
+// ── OAuth button ───────────────────────────────────────────────────────────────
+document.getElementById('btn-oauth').addEventListener('click', async () => {
+  const $btn    = document.getElementById('btn-oauth')
+  const $status = document.getElementById('or-status')
+  $btn.disabled = true
+  $status.style.color = ''
+  $status.textContent = '⏳ Waiting for browser…'
+
+  const result = await window.wizardAPI.startOpenRouterOAuth()
+  if (result.ok) {
+    oauthKey = result.key
+    $btn.style.display = 'none'
+    $status.style.color = 'var(--success)'
+    $status.textContent = '✅ Connected'
+  } else {
+    oauthKey = null
+    $btn.disabled = false
+    $status.style.color = 'var(--error)'
+    $status.textContent = '❌ ' + result.error
+  }
+})
+
 // ── Next / Back ────────────────────────────────────────────────────────────────
 $next.addEventListener('click', async () => {
   if (current === STEP_IDS.length - 1) {
@@ -339,22 +372,29 @@ $next.addEventListener('click', async () => {
   }
 
   if (current === 3) {
-    const orKey  = document.getElementById('input-openrouter').value.trim()
-    const pvKey  = document.getElementById('input-picovoice').value.trim()
-    if (!orKey || !pvKey) {
-      setKeyStatus('⚠️', 'Both keys are required.', 'fail')
+    const pvKey = document.getElementById('input-picovoice').value.trim()
+
+    if (!oauthKey) {
+      setKeyStatus('⚠️', 'Please connect your OpenRouter account first.', 'fail')
       return
     }
-    setKeyStatus('⏳', 'Validating…', 'checking')
+    if (!pvKey) {
+      setKeyStatus('⚠️', 'Picovoice access key is required.', 'fail')
+      return
+    }
+
+    setKeyStatus('⏳', 'Validating Picovoice key…', 'checking')
     $next.disabled = true
-    const r = await window.wizardAPI.validateKeys({ openrouterKey: orKey, picovoiceKey: pvKey })
+
+    const r = await window.wizardAPI.validatePicovoice(pvKey)
     if (!r.ok) {
       setKeyStatus('❌', r.error, 'fail')
       $next.disabled = false
       return
     }
-    await window.wizardAPI.saveKeys({ openrouterKey: orKey, picovoiceKey: pvKey })
-    setKeyStatus('✅', 'Keys saved', 'ok')
+
+    await window.wizardAPI.saveKeys({ openrouterKey: oauthKey, picovoiceKey: pvKey })
+    setKeyStatus('✅', 'All set — keys saved', 'ok')
     markStep(3, true)
   }
 
@@ -364,10 +404,7 @@ $next.addEventListener('click', async () => {
 $back.addEventListener('click', () => { if (current > 0) goTo(current - 1) })
 document.getElementById('btn-close').addEventListener('click', () => window.wizardAPI.close())
 
-// External links (open in browser, not Electron)
-document.getElementById('link-openrouter').addEventListener('click', () => {
-  window.open('https://openrouter.ai/keys')
-})
+// External links
 document.getElementById('link-picovoice').addEventListener('click', () => {
   window.open('https://console.picovoice.ai/')
 })
