@@ -11,8 +11,10 @@
 
 const { app, BrowserWindow, ipcMain, nativeImage, Tray, Menu } = require('electron')
 const path   = require('path')
+const fs     = require('fs')
 const http   = require('http')
 const { spawn } = require('child_process')
+const { createWizardWindow, setupFlagPath } = require('./wizard')
 
 const isPacked    = app.isPackaged
 const apiScript   = isPacked
@@ -183,11 +185,20 @@ function registerIPC() {
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
-app.whenReady().then(() => {
+
+function launchMain() {
   createWindow()
   createTray()
   registerIPC()
-  startApi()   // API starts automatically — no user action needed
+  startApi()
+}
+
+app.whenReady().then(() => {
+  if (fs.existsSync(setupFlagPath)) {
+    launchMain()
+  } else {
+    createWizardWindow({ onComplete: launchMain })
+  }
 })
 app.on('before-quit', () => stopAll())
 app.on('window-all-closed', (e) => e.preventDefault())
