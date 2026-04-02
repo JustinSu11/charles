@@ -28,12 +28,14 @@ torchaudio>=2.1.0     # Audio I/O backend used by Whisper
 pyaudio==0.2.14
 
 # ── Text-to-speech ───────────────────────────────────────────────────────────
-# Piper TTS — local, offline neural TTS (used as an external binary subprocess)
-# The piper-tts PyPI package is NOT listed here — its piper-phonemize dependency
-# has no Python 3.12+ wheels.  Instead, tts.py auto-downloads the piper binary
-# from https://github.com/rhasspy/piper/releases and calls it via subprocess.
-# Voice ONNX models are also auto-downloaded from HuggingFace on first run.
-# See voice/README.md for manual installation instructions.
+# edge-tts — Microsoft Azure Neural TTS voices (requires internet)
+# Streams high-quality voices (Jenny, Guy, Aria, Davis…) via the Edge read-aloud API.
+# No API key required. Voice names: https://bit.ly/edge-tts-voices
+edge-tts>=6.1.9
+
+# miniaudio — pure-Python MP3/WAV/OGG decoder (no ffmpeg required)
+# Used to decode the MP3 audio stream from edge-tts into WAV for PyAudio playback.
+miniaudio>=1.59
 
 # ── HTTP client (talk to Charles API) ───────────────────────────────────────
 requests==2.31.0
