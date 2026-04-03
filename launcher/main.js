@@ -90,7 +90,7 @@ function pollHealth(maxAttempts = 15) {
     const check = () => {
       attempts++
       if (attempts > maxAttempts) { reject(new Error(`API did not start after ${maxAttempts * 2}s`)); return }
-      const req = http.get('http://localhost:8000/health', (res) => {
+      const req = http.get('http://127.0.0.1:8000/health', (res) => {
         res.resume()
         if (res.statusCode === 200) resolve(); else setTimeout(check, 2000)
       })
@@ -103,6 +103,9 @@ function pollHealth(maxAttempts = 15) {
 
 // ── API lifecycle (automatic) ─────────────────────────────────────────────────
 async function startApi() {
+  // Kill any leftover API process (e.g. from a previous instance that hid to tray)
+  if (apiProcess) { try { apiProcess.kill() } catch {} ; apiProcess = null }
+
   mainWindow?.webContents.send('status-update', { state: 'initializing' })
 
   const proc = spawn('python', [apiScript], {
