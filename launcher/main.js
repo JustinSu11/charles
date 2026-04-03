@@ -203,7 +203,9 @@ function launchMain() {
   createWindow()
   createTray()
   registerIPC()
-  startApi()
+  // Defer startApi until the renderer has finished loading so IPC status
+  // events aren't dropped before the listener is registered.
+  mainWindow.webContents.once('did-finish-load', () => startApi())
 }
 
 app.whenReady().then(() => {
