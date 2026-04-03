@@ -218,7 +218,7 @@
       <h2>Connect Accounts</h2>
       <p>Charles needs two things: an AI provider and a wake word licence. Both are free.</p>
 
-      <!-- OpenRouter OAuth -->
+      <!-- OpenRouter OAuth + manual key fallback -->
       <div class="field">
         <label>AI Provider — OpenRouter</label>
         <div id="or-connect-row" style="display:flex; align-items:center; gap:10px;">
@@ -227,7 +227,14 @@
           </button>
           <span id="or-status" style="font-size:.82rem; color:var(--text-muted);">Opens your browser</span>
         </div>
-        <span class="hint">Sign in with Google or GitHub — no key to copy/paste</span>
+        <span class="hint">Sign in with Google or GitHub — no key to copy/paste &nbsp;·&nbsp; <a id="link-manual-key" style="color:var(--accent);cursor:pointer;text-decoration:underline;">I already have an API key</a></span>
+      </div>
+
+      <!-- Manual key input (hidden until "I already have an API key" is clicked) -->
+      <div class="field" id="field-manual-key" style="display:none;">
+        <label>OpenRouter API Key</label>
+        <input type="password" id="input-openrouter-key" placeholder="sk-or-v1-…" autocomplete="off" spellcheck="false" />
+        <span class="hint">Find yours at <a id="link-openrouter-keys" style="color:var(--accent);cursor:pointer;text-decoration:underline;">openrouter.ai/keys</a></span>
       </div>
 
       <!-- Picovoice key -->
@@ -364,12 +371,26 @@ document.getElementById('btn-oauth').addEventListener('click', async () => {
     $btn.style.display = 'none'
     $status.style.color = 'var(--success)'
     $status.textContent = '✅ Connected'
+    // Hide manual input if it was open
+    document.getElementById('field-manual-key').style.display = 'none'
   } else {
     oauthKey = null
     $btn.disabled = false
     $status.style.color = 'var(--error)'
     $status.textContent = '❌ ' + result.error
   }
+})
+
+// ── Manual key fallback ────────────────────────────────────────────────────────
+document.getElementById('link-manual-key').addEventListener('click', () => {
+  const $field = document.getElementById('field-manual-key')
+  const visible = $field.style.display !== 'none'
+  $field.style.display = visible ? 'none' : 'block'
+  if (!visible) document.getElementById('input-openrouter-key').focus()
+})
+
+document.getElementById('link-openrouter-keys').addEventListener('click', () => {
+  window.wizardAPI.openExternal('https://openrouter.ai/keys')
 })
 
 // ── Next / Back ────────────────────────────────────────────────────────────────
@@ -382,8 +403,12 @@ $next.addEventListener('click', async () => {
   if (current === 3) {
     const pvKey = document.getElementById('input-picovoice').value.trim()
 
-    if (!oauthKey) {
-      setKeyStatus('⚠️', 'Please connect your OpenRouter account first.', 'fail')
+    // Accept either the OAuth key or the manually entered key
+    const manualKey = document.getElementById('input-openrouter-key').value.trim()
+    const openrouterKey = oauthKey || manualKey
+
+    if (!openrouterKey) {
+      setKeyStatus('⚠️', 'Connect with OpenRouter or enter your API key manually.', 'fail')
       return
     }
     if (!pvKey) {
@@ -401,7 +426,7 @@ $next.addEventListener('click', async () => {
       return
     }
 
-    await window.wizardAPI.saveKeys({ openrouterKey: oauthKey, picovoiceKey: pvKey })
+    await window.wizardAPI.saveKeys({ openrouterKey: openrouterKey, picovoiceKey: pvKey })
     setKeyStatus('✅', 'All set — keys saved', 'ok')
     markStep(3, true)
   }

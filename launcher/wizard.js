@@ -209,7 +209,7 @@ function _registerHandlers(onComplete) {
 
   // Utility: open a URL in the system browser from renderer code
   ipcMain.handle('wizard:open-external', (_, url) => {
-    const allowed = ['https://console.picovoice.ai/', 'https://openrouter.ai/']
+    const allowed = ['https://console.picovoice.ai/', 'https://openrouter.ai/keys', 'https://openrouter.ai/auth']
     if (allowed.some(prefix => url.startsWith(prefix))) shell.openExternal(url)
   })
 }
