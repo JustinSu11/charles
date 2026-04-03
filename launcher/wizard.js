@@ -109,7 +109,12 @@ function _registerHandlers(onComplete) {
     const verifier  = crypto.randomBytes(32).toString('base64url')
     const challenge = crypto.createHash('sha256').update(verifier).digest('base64url')
 
-    // 2. Local redirect server on a random available port
+    // 2. Local redirect server.
+    //
+    // Use a fixed port so the callback_url is stable across auth attempts.
+    // OpenRouter keys its app registration to the callback_url — a different
+    // port each time looks like a new app and causes a 409 conflict.
+    // Ports 44888–44890 are Charles-specific; we try each in order.
     let resolveCode, rejectCode
     const codePromise = new Promise((res, rej) => { resolveCode = res; rejectCode = rej })
 
@@ -127,11 +132,23 @@ function _registerHandlers(onComplete) {
       else rejectCode(new Error('No authorization code in redirect'))
     })
 
-    await new Promise((res, rej) => server.listen(0, '127.0.0.1', res).on('error', rej))
-    const port = server.address().port
+    const PREFERRED_PORTS = [44888, 44889, 44890]
+    const port = await new Promise((res, rej) => {
+      let i = 0
+      const tryNext = () => {
+        if (i >= PREFERRED_PORTS.length) return rej(new Error('All callback ports are in use. Free port 44888–44890 and try again.'))
+        const p = PREFERRED_PORTS[i++]
+        server.once('error', (err) => {
+          if (err.code === 'EADDRINUSE') tryNext()
+          else rej(err)
+        })
+        server.listen(p, 'localhost', () => res(p))
+      }
+      tryNext()
+    })
 
     // 3. Open browser
-    const callbackUrl = `http://127.0.0.1:${port}`
+    const callbackUrl = `http://localhost:${port}`
     const authUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(callbackUrl)}`
       + `&code_challenge=${challenge}&code_challenge_method=S256`
     shell.openExternal(authUrl)
