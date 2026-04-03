@@ -11,8 +11,10 @@
 
 const { app, BrowserWindow, ipcMain, nativeImage, Tray, Menu } = require('electron')
 const path   = require('path')
+const fs     = require('fs')
 const http   = require('http')
 const { spawn } = require('child_process')
+const { createWizardWindow, setupFlagPath } = require('./wizard')
 
 const isPacked    = app.isPackaged
 const apiScript   = isPacked
@@ -63,6 +65,19 @@ function createTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Show', click: () => mainWindow?.show() },
     { type: 'separator' },
+    {
+      label: 'Re-run Setup…',
+      click: () => {
+        // Delete the setup flag so the wizard opens on next launch,
+        // then restart the app so the change takes effect.
+        try { fs.unlinkSync(setupFlagPath) } catch {}
+        app.isQuiting = true
+        stopAll()
+        app.relaunch()
+        app.quit()
+      },
+    },
+    { type: 'separator' },
     { label: 'Quit', click: () => { app.isQuiting = true; stopAll(); app.quit() } },
   ]))
   tray.on('double-click', () => mainWindow?.show())
@@ -75,7 +90,7 @@ function pollHealth(maxAttempts = 15) {
     const check = () => {
       attempts++
       if (attempts > maxAttempts) { reject(new Error(`API did not start after ${maxAttempts * 2}s`)); return }
-      const req = http.get('http://localhost:8000/health', (res) => {
+      const req = http.get('http://127.0.0.1:8000/health', (res) => {
         res.resume()
         if (res.statusCode === 200) resolve(); else setTimeout(check, 2000)
       })
@@ -88,6 +103,9 @@ function pollHealth(maxAttempts = 15) {
 
 // ── API lifecycle (automatic) ─────────────────────────────────────────────────
 async function startApi() {
+  // Kill any leftover API process (e.g. from a previous instance that hid to tray)
+  if (apiProcess) { try { apiProcess.kill() } catch {} ; apiProcess = null }
+
   mainWindow?.webContents.send('status-update', { state: 'initializing' })
 
   const proc = spawn('python', [apiScript], {
@@ -183,11 +201,29 @@ function registerIPC() {
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
-app.whenReady().then(() => {
+
+function launchMain() {
   createWindow()
   createTray()
   registerIPC()
-  startApi()   // API starts automatically — no user action needed
+  // Defer startApi until the renderer has finished loading so IPC status
+  // events aren't dropped before the listener is registered.
+  mainWindow.webContents.once('did-finish-load', () => startApi())
+}
+
+// Prevent multiple instances — if a second instance is launched, focus
+// the existing window instead of starting a new one.
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+}
+app.on('second-instance', () => { mainWindow?.show(); mainWindow?.focus() })
+
+app.whenReady().then(() => {
+  if (fs.existsSync(setupFlagPath)) {
+    launchMain()
+  } else {
+    createWizardWindow({ onComplete: launchMain })
+  }
 })
 app.on('before-quit', () => stopAll())
 app.on('window-all-closed', (e) => e.preventDefault())

@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.database import engine, ping_db
-from app.routers import chat, history, openai_compat
+from app.routers import chat, history, openai_compat, settings
 from app.services.ws_manager import manager
 
 _STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -53,20 +53,21 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
+    # Only browser-based clients need CORS — Python services bypass it entirely.
+    # The Electron renderer uses file:// origin in prod and localhost:8000 in dev.
     allow_origins=[
-        "http://localhost:8000",   # Electron renderer / browser fallback
-        "http://localhost:8001",   # Voice service
+        "http://localhost:8000",
         "http://127.0.0.1:8000",
-        "http://127.0.0.1:8001",
     ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 app.include_router(chat.router)
 app.include_router(history.router)
 app.include_router(openai_compat.router)
+app.include_router(settings.router)
 
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 

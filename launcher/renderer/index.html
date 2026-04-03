@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';
+                 connect-src http://127.0.0.1:8000 ws://127.0.0.1:8000;" />
   <title>Charles</title>
   <script src="lib/marked.min.js"></script>
   <script src="lib/purify.min.js"></script>
@@ -202,6 +205,20 @@
     #stop-btn:hover { background:#991b1b; }
     #msg-input:disabled { opacity:.4; cursor:not-allowed; }
 
+    #model-select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: .72rem;
+      padding: 3px 6px 3px 8px;
+      cursor: pointer;
+      max-width: 160px;
+      -webkit-app-region: no-drag;
+    }
+    #model-select:focus { outline: none; border-color: var(--accent); }
+    #model-select option { background: #1a1a1a; }
+
     .win-controls { margin-left:auto; display:flex; gap:4px; -webkit-app-region:no-drag; }
     .win-controls button {
       width:28px; height:22px; border:none; border-radius:4px;
@@ -225,6 +242,9 @@
   <span id="voice-pill"></span>
   <button id="start-btn">Start</button>
   <button id="stop-btn" style="display:none">Stop</button>
+  <select id="model-select" title="Active model">
+    <option disabled selected>Loading models…</option>
+  </select>
   <div class="win-controls">
     <button id="btn-minimize" title="Minimize">&#8722;</button>
     <button id="btn-close"    title="Close">&#x2715;</button>
@@ -240,8 +260,8 @@
 
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
-const API_BASE = 'http://localhost:8000';
-const WS_URL   = 'ws://localhost:8000/ws';
+const API_BASE = 'http://127.0.0.1:8000';
+const WS_URL   = 'ws://127.0.0.1:8000/ws';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let conversationId      = null;   // set after first turn or history load
@@ -521,6 +541,49 @@ function setVoiceState(state) {
 $startBtn.addEventListener('click', () => window.electronAPI.start());
 $stopBtn.addEventListener('click',  () => window.electronAPI.stop());
 
+// ── Model selector ────────────────────────────────────────────────────────────
+const $modelSelect = document.getElementById('model-select');
+let modelSelectReady = false;
+
+async function initModelSelector() {
+  if (modelSelectReady) return;
+  try {
+    const [listRes, currentRes] = await Promise.all([
+      fetch(`${API_BASE}/models`),
+      fetch(`${API_BASE}/settings/model`),
+    ]);
+    const { models }       = await listRes.json();
+    const { model: active } = await currentRes.json();
+
+    $modelSelect.textContent = '';
+    for (const m of models) {
+      const opt = document.createElement('option');
+      opt.value       = m.id;
+      opt.textContent = m.name;
+      if (m.id === active) opt.selected = true;
+      $modelSelect.appendChild(opt);
+    }
+    // If the active model isn't in the returned list, prepend it so the
+    // UI always reflects the real selection (e.g. set via env var).
+    if ($modelSelect.value !== active) {
+      const opt = document.createElement('option');
+      opt.value = active; opt.textContent = active; opt.selected = true;
+      $modelSelect.insertBefore(opt, $modelSelect.firstChild);
+    }
+    modelSelectReady = true;
+  } catch {
+    $modelSelect.options[0].textContent = 'Model unavailable';
+  }
+}
+
+$modelSelect.addEventListener('change', () => {
+  fetch(`${API_BASE}/settings/model`, {
+    method:  'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ model: $modelSelect.value }),
+  });
+});
+
 // Window chrome controls (frameless window has no native buttons)
 document.getElementById('btn-minimize').addEventListener('click', () => window.electronAPI.minimize());
 document.getElementById('btn-close').addEventListener('click',    () => window.electronAPI.closeWindow());
@@ -532,6 +595,7 @@ const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => 
     if (!socket || socket.readyState === WebSocket.CLOSED) {
       loadHistory().then(() => connectWebSocket());
     }
+    initModelSelector();
   }
 });
 const cleanupVoice      = window.electronAPI.onVoiceState(({ state }) => setVoiceState(state));

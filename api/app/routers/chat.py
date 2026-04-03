@@ -51,9 +51,15 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     )
     await db.commit()
 
-    # 4. Call OpenRouter
+    # 4. Resolve the active model (set via PUT /settings/model; falls back to env default)
+    model_row = (await db.execute(
+        text("SELECT value FROM app_state WHERE key = 'active_model'")
+    )).fetchone()
+    active_model = model_row[0] if model_row else None
+
+    # 5. Call OpenRouter
     try:
-        assistant_reply = await get_openrouter_response(history)
+        assistant_reply = await get_openrouter_response(history, model=active_model)
     except httpx.HTTPStatusError as e:
         status = e.response.status_code
         if status == 429:
@@ -69,7 +75,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="OpenRouter timed out. Try again.")
 
-    # 5. Store assistant reply
+    # 6. Store assistant reply
     assistant_message_id = str(uuid.uuid4())
     await db.execute(
         text("""
@@ -80,7 +86,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     )
     await db.commit()
 
-    # 6. Broadcast to all connected WebSocket clients
+    # 7. Broadcast to all connected WebSocket clients
     await manager.broadcast({
         "type": "turn",
         "interface": request.interface,
