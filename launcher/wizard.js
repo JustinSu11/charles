@@ -14,9 +14,6 @@
 const { BrowserWindow, ipcMain, app, shell } = require('electron')
 const path    = require('path')
 const fs      = require('fs')
-const http    = require('http')
-const https   = require('https')
-const crypto  = require('crypto')
 const { spawn } = require('child_process')
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
@@ -94,85 +91,6 @@ function _registerHandlers(onComplete) {
     }
   })
 
-  // ── Step 3a: OpenRouter OAuth (PKCE) ──────────────────────────────────────
-  //
-  // Flow:
-  //   1. Generate a random PKCE verifier + SHA-256 challenge
-  //   2. Start a temporary localhost server to catch the redirect
-  //   3. Open the system browser to OpenRouter's auth page
-  //   4. Wait for the redirect (2-minute timeout)
-  //   5. Exchange the auth code for an API key
-  //   6. Return the key to the renderer — it is saved to .env on Next click
-  //
-  ipcMain.handle('wizard:start-openrouter-oauth', async () => {
-    // 1. PKCE
-    const verifier  = crypto.randomBytes(32).toString('base64url')
-    const challenge = crypto.createHash('sha256').update(verifier).digest('base64url')
-
-    // 2. Local redirect server.
-    //
-    // Use a fixed port so the callback_url is stable across auth attempts.
-    // OpenRouter keys its app registration to the callback_url — a different
-    // port each time looks like a new app and causes a 409 conflict.
-    // Ports 44888–44890 are Charles-specific; we try each in order.
-    let resolveCode, rejectCode
-    const codePromise = new Promise((res, rej) => { resolveCode = res; rejectCode = rej })
-
-    const server = http.createServer((req, res) => {
-      const url  = new URL(req.url, 'http://localhost')
-      const code = url.searchParams.get('code')
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' })
-      res.end(`<!DOCTYPE html><html><body style="font-family:sans-serif;
-        background:#0d0d0d;color:#e8e8e8;display:flex;align-items:center;
-        justify-content:center;height:100vh;margin:0;text-align:center">
-        <div><div style="font-size:3rem">✅</div>
-        <h2>Connected! You can close this tab.</h2></div></body></html>`)
-      server.close()
-      if (code) resolveCode(code)
-      else rejectCode(new Error('No authorization code in redirect'))
-    })
-
-    const PREFERRED_PORTS = [44888, 44889, 44890]
-    const port = await new Promise((res, rej) => {
-      let i = 0
-      const tryNext = () => {
-        if (i >= PREFERRED_PORTS.length) return rej(new Error('All callback ports are in use. Free port 44888–44890 and try again.'))
-        const p = PREFERRED_PORTS[i++]
-        server.once('error', (err) => {
-          if (err.code === 'EADDRINUSE') tryNext()
-          else rej(err)
-        })
-        server.listen(p, 'localhost', () => res(p))
-      }
-      tryNext()
-    })
-
-    // 3. Open browser
-    const callbackUrl = `http://localhost:${port}`
-    const authUrl = `https://openrouter.ai/auth?callback_url=${encodeURIComponent(callbackUrl)}`
-      + `&code_challenge=${challenge}&code_challenge_method=S256`
-    shell.openExternal(authUrl)
-
-    // 4. Wait for redirect (2-minute timeout)
-    const timer = setTimeout(() => {
-      server.close()
-      rejectCode(new Error('Authentication timed out. Please try again.'))
-    }, 120_000)
-
-    try {
-      const code = await codePromise
-      clearTimeout(timer)
-
-      // 5. Exchange code → API key
-      const key = await _exchangeCodeForKey(code, verifier)
-      return { ok: true, key }
-    } catch (err) {
-      clearTimeout(timer)
-      server.close()
-      return { ok: false, error: err.message }
-    }
-  })
-
   // ── Step 3b: validate Picovoice key ───────────────────────────────────────
   ipcMain.handle('wizard:validate-picovoice', async (_, { picovoiceKey }) => {
     return validatePicovoiceKey(picovoiceKey)
@@ -209,50 +127,18 @@ function _registerHandlers(onComplete) {
 
   // Utility: open a URL in the system browser from renderer code
   ipcMain.handle('wizard:open-external', (_, url) => {
-    const allowed = ['https://console.picovoice.ai/', 'https://openrouter.ai/keys', 'https://openrouter.ai/auth']
+    const allowed = ['https://console.picovoice.ai/', 'https://openrouter.ai/keys']
     if (allowed.some(prefix => url.startsWith(prefix))) shell.openExternal(url)
   })
 }
 
 function _removeHandlers() {
   for (const ch of ['wizard:check-python', 'wizard:install-deps',
-                     'wizard:start-openrouter-oauth', 'wizard:validate-picovoice',
+                     'wizard:validate-picovoice',
                      'wizard:save-keys', 'wizard:finish', 'wizard:close',
                      'wizard:open-external']) {
     ipcMain.removeHandler(ch)
   }
-}
-
-// ── OpenRouter code → key exchange ────────────────────────────────────────────
-
-function _exchangeCodeForKey(code, verifier) {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ code, code_verifier: verifier })
-    const req  = https.request({
-      hostname: 'openrouter.ai',
-      path:     '/api/v1/auth/keys',
-      method:   'POST',
-      headers:  {
-        'Content-Type':   'application/json',
-        'Content-Length': Buffer.byteLength(body),
-      },
-    }, (res) => {
-      let data = ''
-      res.on('data', d => { data += d })
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data)
-          if (json.key) resolve(json.key)
-          else reject(new Error(json.error || 'OpenRouter did not return a key'))
-        } catch {
-          reject(new Error('Invalid response from OpenRouter'))
-        }
-      })
-    })
-    req.on('error', reject)
-    req.write(body)
-    req.end()
-  })
 }
 
 // ── Picovoice key validation ──────────────────────────────────────────────────
