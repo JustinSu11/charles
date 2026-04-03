@@ -312,6 +312,7 @@ async function activateStep(index) {
   if (index === 0) { passed[0] = true; $next.disabled = false; }
   if (index === 1) await runPythonCheck()
   if (index === 2) await runInstall()
+  if (index === 3) { passed[3] = true; $next.disabled = false; }
 }
 
 async function runPythonCheck() {
