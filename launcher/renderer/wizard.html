@@ -188,6 +188,12 @@
         ② Install Python packages for the API and voice service<br>
         ③ Save your API keys to <code>.env</code>
       </p>
+      <p style="font-size:.8rem; color:var(--text-muted); border-top:1px solid var(--border); padding-top:14px; margin-top:4px; line-height:1.7;">
+        🔒 <strong style="color:var(--text)">Privacy note:</strong>
+        Voice responses are synthesised by Microsoft Azure Neural TTS via the <code>edge-tts</code> library.
+        The text of each response is sent to Microsoft's servers to generate audio.
+        All other processing (wake word, speech-to-text, AI chat) runs locally or through your own API keys.
+      </p>
     </div>
 
     <!-- Step 1: Python -->
@@ -406,9 +412,9 @@ $next.addEventListener('click', async () => {
 $back.addEventListener('click', () => { if (current > 0) goTo(current - 1) })
 document.getElementById('btn-close').addEventListener('click', () => window.wizardAPI.close())
 
-// External links
+// External links — must go via main process shell.openExternal (window.open opens an Electron window)
 document.getElementById('link-picovoice').addEventListener('click', () => {
-  window.open('https://console.picovoice.ai/')
+  window.wizardAPI.openExternal('https://console.picovoice.ai/')
 })
 
 // ── Boot ───────────────────────────────────────────────────────────────────────

@@ -189,12 +189,19 @@ function _registerHandlers(onComplete) {
   })
 
   ipcMain.handle('wizard:close', () => { app.quit() })
+
+  // Utility: open a URL in the system browser from renderer code
+  ipcMain.handle('wizard:open-external', (_, url) => {
+    const allowed = ['https://console.picovoice.ai/', 'https://openrouter.ai/']
+    if (allowed.some(prefix => url.startsWith(prefix))) shell.openExternal(url)
+  })
 }
 
 function _removeHandlers() {
   for (const ch of ['wizard:check-python', 'wizard:install-deps',
                      'wizard:start-openrouter-oauth', 'wizard:validate-picovoice',
-                     'wizard:save-keys', 'wizard:finish', 'wizard:close']) {
+                     'wizard:save-keys', 'wizard:finish', 'wizard:close',
+                     'wizard:open-external']) {
     ipcMain.removeHandler(ch)
   }
 }

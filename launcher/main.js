@@ -65,6 +65,19 @@ function createTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Show', click: () => mainWindow?.show() },
     { type: 'separator' },
+    {
+      label: 'Re-run Setup…',
+      click: () => {
+        // Delete the setup flag so the wizard opens on next launch,
+        // then restart the app so the change takes effect.
+        try { fs.unlinkSync(setupFlagPath) } catch {}
+        app.isQuiting = true
+        stopAll()
+        app.relaunch()
+        app.quit()
+      },
+    },
+    { type: 'separator' },
     { label: 'Quit', click: () => { app.isQuiting = true; stopAll(); app.quit() } },
   ]))
   tray.on('double-click', () => mainWindow?.show())

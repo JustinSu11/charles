@@ -14,4 +14,6 @@ contextBridge.exposeInMainWorld('wizardAPI', {
     ipcRenderer.on('wizard:install-progress', listener)
     return () => ipcRenderer.removeListener('wizard:install-progress', listener)
   },
+
+  openExternal: (url) => ipcRenderer.invoke('wizard:open-external', url),
 })
