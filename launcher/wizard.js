@@ -182,7 +182,7 @@ async function validatePicovoiceKey(picovoiceKey) {
     // string — so quotes or special characters in the key can't break anything.
     const script = [
       'import pvporcupine, os',
-      'pv = pvporcupine.create(access_key=os.environ["PV_KEY"])',
+      'pv = pvporcupine.create(access_key=os.environ["PV_KEY"], keywords=["porcupine"])',
       'pv.delete()',
     ].join('; ')
 
