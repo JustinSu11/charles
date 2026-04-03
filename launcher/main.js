@@ -43,7 +43,6 @@ function createWindow() {
     },
   })
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'))
-  mainWindow.webContents.openDevTools({ mode: 'detach' })
   mainWindow.on('close', (e) => {
     if (!app.isQuiting) { e.preventDefault(); mainWindow.hide() }
   })
@@ -130,7 +129,6 @@ async function startApi() {
 
   try {
     await pollHealth()
-    console.log('[main] pollHealth resolved, sending ready. mainWindow:', !!mainWindow)
     mainWindow?.webContents.send('status-update', { state: 'ready' })
   } catch (err) {
     apiProcess?.kill(); apiProcess = null
@@ -212,6 +210,13 @@ function launchMain() {
   // events aren't dropped before the listener is registered.
   mainWindow.webContents.once('did-finish-load', () => startApi())
 }
+
+// Prevent multiple instances — if a second instance is launched, focus
+// the existing window instead of starting a new one.
+if (!app.requestSingleInstanceLock()) {
+  app.quit()
+}
+app.on('second-instance', () => { mainWindow?.show(); mainWindow?.focus() })
 
 app.whenReady().then(() => {
   if (fs.existsSync(setupFlagPath)) {
