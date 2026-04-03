@@ -43,6 +43,7 @@ function createWindow() {
     },
   })
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'))
+  mainWindow.webContents.openDevTools({ mode: 'detach' })
   mainWindow.on('close', (e) => {
     if (!app.isQuiting) { e.preventDefault(); mainWindow.hide() }
   })
@@ -129,6 +130,7 @@ async function startApi() {
 
   try {
     await pollHealth()
+    console.log('[main] pollHealth resolved, sending ready. mainWindow:', !!mainWindow)
     mainWindow?.webContents.send('status-update', { state: 'ready' })
   } catch (err) {
     apiProcess?.kill(); apiProcess = null
