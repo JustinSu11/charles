@@ -14,16 +14,18 @@ SYSTEM_PROMPT = (
     "When asked about vulnerabilities or security topics, be thorough but clear."
 )
 
-"""
-Takes full conversation history so that the LLM has context for the whole conversation.
-"""
-async def get_openrouter_response(conversation_history: list[dict]) -> str:
+async def get_openrouter_response(
+    conversation_history: list[dict],
+    model: str | None = None,
+) -> str:
     """
     Send conversation history to OpenRouter and return the assistant reply.
 
     Args:
         conversation_history: List of {"role": ..., "content": ...} dicts
                                representing the full conversation so far.
+        model: OpenRouter model ID to use (e.g. "openai/gpt-4o").
+               Falls back to the OPENROUTER_MODEL env var if not provided.
     Returns:
         The assistant's reply as a plain string.
     Raises:
@@ -44,7 +46,7 @@ async def get_openrouter_response(conversation_history: list[dict]) -> str:
     }
 
     payload = {
-        "model": MODEL,
+        "model": model or MODEL,
         "messages": messages,
     }
 

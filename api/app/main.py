@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.database import engine, ping_db
-from app.routers import chat, history, openai_compat
+from app.routers import chat, history, openai_compat, settings
 from app.services.ws_manager import manager
 
 _STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -67,6 +67,7 @@ app.add_middleware(
 app.include_router(chat.router)
 app.include_router(history.router)
 app.include_router(openai_compat.router)
+app.include_router(settings.router)
 
 app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
