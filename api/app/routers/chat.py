@@ -1,3 +1,4 @@
+import asyncio
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +10,8 @@ from app.models import ChatRequest, ChatResponse
 from app.services.openrouter import get_openrouter_response
 from app.services.conversation import get_or_create_shared_conversation
 from app.services.ws_manager import manager
+from app.services.skill_router import route as route_skills
+from app.skills import run_skill
 
 router = APIRouter()
 
@@ -57,9 +60,18 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     )).fetchone()
     active_model = model_row[0] if model_row else None
 
-    # 5. Call OpenRouter
+    # 5. Route message to skills and fetch live data for any that activate
+    activated = route_skills(request.message)
+    skill_context: str | None = None
+    if activated:
+        skill_blocks = await asyncio.gather(*[run_skill(name) for name in activated])
+        skill_context = "\n\n---\n\n".join(skill_blocks)
+
+    # 6. Call OpenRouter
     try:
-        assistant_reply = await get_openrouter_response(history, model=active_model)
+        assistant_reply = await get_openrouter_response(
+            history, model=active_model, skill_context=skill_context
+        )
     except httpx.HTTPStatusError as e:
         status = e.response.status_code
         if status == 429:
@@ -75,7 +87,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="OpenRouter timed out. Try again.")
 
-    # 6. Store assistant reply
+    # 7. Store assistant reply
     assistant_message_id = str(uuid.uuid4())
     await db.execute(
         text("""
@@ -86,7 +98,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     )
     await db.commit()
 
-    # 7. Broadcast to all connected WebSocket clients
+    # 8. Broadcast to all connected WebSocket clients
     await manager.broadcast({
         "type": "turn",
         "interface": request.interface,

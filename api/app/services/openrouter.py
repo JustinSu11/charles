@@ -8,7 +8,7 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 MODEL = os.getenv("OPENROUTER_MODEL", "deepseek/deepseek-v3.2")
 
-SYSTEM_PROMPT = (
+BASE_SYSTEM_PROMPT = (
     "You are Charles, a helpful AI assistant. "
     "You are concise, accurate, and security-aware. "
     "When asked about vulnerabilities or security topics, be thorough but clear."
@@ -17,6 +17,7 @@ SYSTEM_PROMPT = (
 async def get_openrouter_response(
     conversation_history: list[dict],
     model: str | None = None,
+    skill_context: str | None = None,
 ) -> str:
     """
     Send conversation history to OpenRouter and return the assistant reply.
@@ -34,8 +35,13 @@ async def get_openrouter_response(
     """
     if not OPENROUTER_API_KEY:
         raise ValueError("OPENROUTER_API_KEY is not set in environment")
-    
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + conversation_history
+
+    from api.app.skills import get_skill_index
+    system_prompt = BASE_SYSTEM_PROMPT + "\n\n" + get_skill_index()
+    if skill_context:
+        system_prompt += "\n\n" + skill_context
+
+    messages = [{"role": "system", "content": system_prompt}] + conversation_history
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_API_KEY}",
