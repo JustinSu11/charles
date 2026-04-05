@@ -1,7 +1,8 @@
 # Voice Service — Python Dependencies
 # Install with: pip install -r requirements.txt
 #
-# Requires Python 3.10+
+# Requires Python 3.10–3.12  (Python 3.13+ not yet supported — torch / PyAudio
+#                              / pvporcupine wheels require PyO3 ≤ 0.20 which caps at 3.12)
 # Tested on Windows (WASAPI), macOS (CoreAudio), Linux (ALSA/PulseAudio)
 
 # ── Wake word detection ──────────────────────────────────────────────────────

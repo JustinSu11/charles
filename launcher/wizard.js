@@ -59,7 +59,13 @@ function _registerHandlers(onComplete) {
       const [, major, minor, patch] = match.map(Number)
       const version = `${major}.${minor}.${patch}`
       if (major < 3 || (major === 3 && minor < 10)) {
-        return resolve({ ok: false, version, error: `Python ${version} found but 3.10+ is required.` })
+        return resolve({ ok: false, version, error: `Python ${version} found but 3.10–3.12 is required.` })
+      }
+      if (major > 3 || (major === 3 && minor > 12)) {
+        return resolve({
+          ok: false, version,
+          error: `Python ${version} is not yet supported. Please install Python 3.11 or 3.12 from python.org.`,
+        })
       }
       resolve({ ok: true, version })
     })
