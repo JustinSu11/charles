@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   interrupt:   () => ipcRenderer.invoke('interrupt-voice'),
   minimize:    () => ipcRenderer.invoke('minimize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
+  quitApp:     () => ipcRenderer.invoke('quit-app'),
   onStatusUpdate: (cb) => {
     const listener = (_e, d) => cb(d)
     ipcRenderer.on('status-update', listener)

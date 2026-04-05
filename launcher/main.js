@@ -210,6 +210,7 @@ function registerIPC() {
   })
   ipcMain.handle('minimize-window', () => mainWindow?.minimize())
   ipcMain.handle('close-window',    () => mainWindow?.close())
+  ipcMain.handle('quit-app',        () => { app.isQuiting = true; stopAll(); app.quit() })
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
