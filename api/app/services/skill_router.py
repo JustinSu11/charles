@@ -76,9 +76,47 @@ def _should_fetch_cve(message: str) -> bool:
     return False
 
 
+def _should_fetch_virustotal(message: str) -> bool:
+    # TODO (your turn): implement VirusTotal trigger detection
+    #
+    # This one has an interesting wrinkle: the trigger isn't just vocabulary,
+    # it can also be the presence of a hash-shaped string in the message.
+    # Someone might paste "d41d8cd98f00b204e9800998ecf8427e" and ask "is this safe?"
+    # without ever saying "virustotal".
+    #
+    # Things to think about:
+    #   - Direct mentions: "virustotal", "virus total", "vt scan"
+    #   - Intent words: "scan this", "check this file", "is this safe", "malware"
+    #   - Hash detection: MD5 is 32 hex chars, SHA-1 is 40, SHA-256 is 64
+    #     You can detect a likely hash with: all chars in "0-9a-f" and length in {32, 40, 64}
+    #
+    # Hint for hash detection (one approach):
+    #   import re
+    #   if re.search(r'\b[0-9a-f]{32}\b|\b[0-9a-f]{40}\b|\b[0-9a-f]{64}\b', message):
+    #       return True
+    #
+    # Should "is this file safe?" alone trigger VirusTotal? Probably not without
+    # a hash or URL present — that's just a general safety question.
+    # Tier 1 — unambiguous: direct name mention or a hash-shaped string
+    if "virustotal" in message or "virus total" in message or "vt scan" in message:
+        return True
+
+    import re
+    if re.search(r'\b[0-9a-f]{32}\b|\b[0-9a-f]{40}\b|\b[0-9a-f]{64}\b', message):
+        return True
+
+    # Tier 2 — intent words that imply a scan request
+    malware_words = {"malware", "is this safe"}
+    if any(word in message for word in malware_words):
+        return True
+
+    return False
+
+
 _TRIGGER_MAP: dict[str, callable] = {
-    "tech_news": _should_fetch_news,
-    "cve":       _should_fetch_cve,
+    "tech_news":  _should_fetch_news,
+    "cve":        _should_fetch_cve,
+    "virustotal": _should_fetch_virustotal,
 }
 
 # ── Router ────────────────────────────────────────────────────────────────────

@@ -13,13 +13,14 @@ chat.py uses it to:
   - Inject full instructions + fetched data only for active skills
 """
 
-from api.app.skills import tech_news, cve
+from api.app.skills import tech_news, cve, virustotal
 
 # ── Registry ──────────────────────────────────────────────────────────────────
 # Maps skill name → module. Add new skills here and nowhere else.
 SKILLS: dict = {
-    "tech_news": tech_news,
-    "cve":       cve,
+    "tech_news":  tech_news,
+    "cve":        cve,
+    "virustotal": virustotal,
 }
 
 
@@ -45,7 +46,12 @@ async def run_skill(name: str) -> str:
 
     Includes both the full INSTRUCTIONS and the fetched data so the LLM
     knows both *how* to respond and *what* to respond with.
+
+    If fetch() returns None (instructional-only skills), only INSTRUCTIONS
+    are injected — no data block is appended.
     """
     module = SKILLS[name]
     data = await module.fetch()
+    if data is None:
+        return module.INSTRUCTIONS
     return f"{module.INSTRUCTIONS}\n\n{module.format(data)}"
