@@ -167,8 +167,14 @@ async function startVoice() {
       }
     })
     vproc.on('exit', (code) => {
-      if (code !== 0 && code !== null && voiceProcess === vproc) {
-        mainWindow?.webContents.send('voice-state-update', { state: 'error' })
+      if (voiceProcess === vproc) {
+        // On error exit: show voice error badge
+        if (code !== 0 && code !== null) {
+          mainWindow?.webContents.send('voice-state-update', { state: 'error' })
+        }
+        // Always transition back to ready — covers clean exits (stop command)
+        // and error exits alike so the Stop button and voice pill always reset.
+        mainWindow?.webContents.send('status-update', { state: 'ready' })
         voiceProcess = null
       }
     })

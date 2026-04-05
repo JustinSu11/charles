@@ -1,6 +1,9 @@
 import asyncio
+import logging
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
+
+_log = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 import httpx
@@ -60,12 +63,20 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     )).fetchone()
     active_model = model_row[0] if model_row else None
 
-    # 5. Route message to skills and fetch live data for any that activate
+    # 5. Route message to skills and fetch live data for any that activate.
+    #    Failures are caught per-skill so one bad external API call never
+    #    kills the whole request — Charles still replies, just without that data.
     activated = route_skills(request.message)
     skill_context: str | None = None
     if activated:
-        skill_blocks = await asyncio.gather(*[run_skill(name) for name in activated])
-        skill_context = "\n\n---\n\n".join(skill_blocks)
+        skill_blocks = []
+        for name in activated:
+            try:
+                skill_blocks.append(await run_skill(name))
+            except Exception as exc:
+                _log.warning("Skill '%s' failed — proceeding without it: %s", name, exc)
+        if skill_blocks:
+            skill_context = "\n\n---\n\n".join(skill_blocks)
 
     # 6. Call OpenRouter
     try:
