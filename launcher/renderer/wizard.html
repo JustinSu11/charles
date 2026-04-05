@@ -104,10 +104,12 @@
     #install-log {
       flex: 1; background: #0a0a0a;
       border: 1px solid var(--border); border-radius: 8px;
-      padding: 12px; overflow-y: auto;
+      padding: 12px; overflow-y: scroll;
+      max-height: 260px;
       font-family: "Consolas", "SF Mono", monospace;
       font-size: .78rem; color: #9ca3af;
       white-space: pre-wrap; word-break: break-all;
+      user-select: text; -webkit-user-select: text;
     }
 
     /* API key inputs */
