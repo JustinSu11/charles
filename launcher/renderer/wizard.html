@@ -209,8 +209,12 @@
     <!-- Step 2: Dependencies -->
     <div class="panel" id="panel-2">
       <h2>Install Dependencies</h2>
-      <p>Installing Python packages for the API and voice service. This may take a minute on first run.</p>
+      <p>Installing Python packages for the API and voice service. This may take a few minutes — <strong style="color:var(--text)">torch (~2 GB)</strong> downloads on first run.</p>
       <div id="install-log">Waiting to start…</div>
+      <div style="display:flex; justify-content:flex-end; margin-top:6px;">
+        <button id="copy-log-btn" style="background:transparent;border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:4px 12px;font-size:.75rem;cursor:pointer;">Copy Log</button>
+      </div>
+      <div id="install-error" style="display:none;margin-top:8px;padding:10px 14px;border-radius:8px;border:1px solid #991b1b;background:#7f1d1d22;color:#fca5a5;font-size:.82rem;line-height:1.5;"></div>
     </div>
 
     <!-- Step 3: Connect accounts -->
@@ -339,8 +343,10 @@ async function runInstall() {
   if (installing) return
   installing = true
   $next.disabled = true
-  const $log = document.getElementById('install-log')
+  const $log      = document.getElementById('install-log')
+  const $errBox   = document.getElementById('install-error')
   $log.textContent = ''
+  $errBox.style.display = 'none'
   if (cleanupLog) { cleanupLog(); cleanupLog = null }
   cleanupLog = window.wizardAPI.onInstallProgress(({ text }) => {
     $log.textContent += text
@@ -350,7 +356,24 @@ async function runInstall() {
   installing = false
   if (cleanupLog) { cleanupLog(); cleanupLog = null }
   markStep(2, r.ok)
+  if (!r.ok) {
+    // Surface the last error line so users don't have to scroll to find it
+    const lines = $log.textContent.trim().split('\n')
+    const errLine = lines.filter(l => l.toLowerCase().includes('error')).at(-1) || r.error || 'Installation failed.'
+    $errBox.textContent = '✗ ' + errLine + '\n\nScroll the log above for full details, or click "Copy Log" to share with your team.'
+    $errBox.style.display = 'block'
+  }
 }
+
+// Copy log to clipboard
+document.getElementById('copy-log-btn').addEventListener('click', () => {
+  const text = document.getElementById('install-log').textContent
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-log-btn')
+    btn.textContent = 'Copied!'
+    setTimeout(() => { btn.textContent = 'Copy Log' }, 2000)
+  })
+})
 
 // ── External links ─────────────────────────────────────────────────────────────
 document.getElementById('link-openrouter-keys').addEventListener('click', () => {

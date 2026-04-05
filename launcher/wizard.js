@@ -82,6 +82,7 @@ function _registerHandlers(onComplete) {
 
     try {
       await runPip('Installing API dependencies…',   path.join(projectRoot, 'api',   'requirements.txt'))
+      send('\n⚠  Installing voice dependencies — torch (~2 GB) will download on first run.\n    This step can take several minutes on a slow connection. Please wait…\n')
       await runPip('Installing voice dependencies…', path.join(projectRoot, 'voice', 'requirements.txt'))
       send('\n✓  All dependencies installed successfully.\n')
       return { ok: true }
