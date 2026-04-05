@@ -1,5 +1,9 @@
+import asyncio
+import logging
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
+
+_log = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 import httpx
@@ -9,6 +13,8 @@ from app.models import ChatRequest, ChatResponse
 from app.services.openrouter import get_openrouter_response
 from app.services.conversation import get_or_create_shared_conversation
 from app.services.ws_manager import manager
+from app.services.skill_router import route as route_skills
+from app.skills import run_skill
 
 router = APIRouter()
 
@@ -51,9 +57,39 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     )
     await db.commit()
 
-    # 4. Call OpenRouter
+    # 4. Resolve the active model (set via PUT /settings/model; falls back to env default)
+    model_row = (await db.execute(
+        text("SELECT value FROM app_state WHERE key = 'active_model'")
+    )).fetchone()
+    active_model = model_row[0] if model_row else None
+
+    # 5. Route message to skills and fetch live data for any that activate.
+    #    Each skill gets SKILL_TIMEOUT_SECS to fetch external data. If it
+    #    exceeds the budget or errors, Charles replies without that context
+    #    rather than blocking the whole request.
+    SKILL_TIMEOUT_SECS = 8.0
+    activated = route_skills(request.message)
+    skill_context: str | None = None
+    if activated:
+        skill_blocks = []
+        for name in activated:
+            try:
+                skill_blocks.append(
+                    await asyncio.wait_for(run_skill(name, request.message), timeout=SKILL_TIMEOUT_SECS)
+                )
+            except asyncio.TimeoutError:
+                _log.warning("Skill '%s' timed out after %.0fs — proceeding without it", name, SKILL_TIMEOUT_SECS)
+            except Exception as exc:
+                _log.warning("Skill '%s' failed — proceeding without it: %s", name, exc)
+        if skill_blocks:
+            skill_context = "\n\n---\n\n".join(skill_blocks)
+
+    # 6. Call OpenRouter
     try:
-        assistant_reply = await get_openrouter_response(history)
+        assistant_reply = await get_openrouter_response(
+            history, model=active_model, skill_context=skill_context,
+            interface=request.interface,
+        )
     except httpx.HTTPStatusError as e:
         status = e.response.status_code
         if status == 429:
@@ -69,7 +105,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     except httpx.TimeoutException:
         raise HTTPException(status_code=504, detail="OpenRouter timed out. Try again.")
 
-    # 5. Store assistant reply
+    # 7. Store assistant reply
     assistant_message_id = str(uuid.uuid4())
     await db.execute(
         text("""
@@ -80,7 +116,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     )
     await db.commit()
 
-    # 6. Broadcast to all connected WebSocket clients
+    # 8. Broadcast to all connected WebSocket clients
     await manager.broadcast({
         "type": "turn",
         "interface": request.interface,

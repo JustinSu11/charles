@@ -3,6 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';
+                 connect-src http://127.0.0.1:8000 ws://127.0.0.1:8000;" />
   <title>Charles</title>
   <script src="lib/marked.min.js"></script>
   <script src="lib/purify.min.js"></script>
@@ -120,6 +123,22 @@
     .bubble pre code { background: none; padding: 0; }
     .bubble ul, .bubble ol { padding-left: 1.4em; }
 
+    /* ── Wave dot animation (thinking, transcribing, any loading state) ── */
+    @keyframes wave {
+      0%, 60%, 100% { transform: translateY(0);    opacity: 0.35; }
+      30%           { transform: translateY(-5px); opacity: 1;    }
+    }
+    .wave-dots { display: inline-flex; gap: 3px; vertical-align: middle; }
+    .wave-dots span {
+      display: inline-block;
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: currentColor;
+      animation: wave 1.2s ease-in-out infinite;
+    }
+    .wave-dots span:nth-child(2) { animation-delay: 0.15s; }
+    .wave-dots span:nth-child(3) { animation-delay: 0.30s; }
+
     /* thinking indicator */
     .thinking {
       align-self: flex-start;
@@ -128,9 +147,10 @@
       font-size: .85rem;
       font-style: italic;
       padding: 8px 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
-    .thinking span { animation: blink 1.2s step-start infinite; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
 
     /* ── Input bar ── */
     #input-bar {
@@ -191,6 +211,7 @@
     #status-label { font-size:.8rem; color:var(--text-muted); flex:1; }
 
     #voice-pill { font-size:.72rem; padding:2px 8px; border-radius:999px; display:none; }
+    #voice-pill.standby      { display:inline; background:#1c2330; color:#6b7280; }
     #voice-pill.listening    { display:inline; background:#2e1065; color:#a78bfa; }
     #voice-pill.transcribing { display:inline; background:#1f2937; color:#9ca3af; }
     #voice-pill.speaking     { display:inline; background:#431407; color:#fb923c; }
@@ -199,9 +220,27 @@
     #start-btn { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:5px 14px; font-size:.8rem; font-weight:600; cursor:pointer; }
     #start-btn:hover:not(:disabled) { background:#1d4ed8; }
     #start-btn:disabled { background:#374151; color:#6b7280; cursor:not-allowed; }
-    #stop-btn  { background:#7f1d1d; color:#fca5a5; border:none; border-radius:8px; padding:5px 14px; font-size:.8rem; font-weight:600; cursor:pointer; }
+    #stop-btn      { background:#7f1d1d; color:#fca5a5; border:none; border-radius:8px; padding:5px 14px; font-size:.8rem; font-weight:600; cursor:pointer; }
     #stop-btn:hover { background:#991b1b; }
+    #interrupt-btn  { background:#1e3a5f; color:#93c5fd; border:none; border-radius:8px; padding:5px 14px; font-size:.8rem; font-weight:600; cursor:pointer; }
+    #interrupt-btn:hover { background:#1e40af; }
+    #clear-chat-btn { background:transparent; color:#4b5563; border:1px solid #2a2a2a; border-radius:8px; padding:5px 14px; font-size:.8rem; cursor:pointer; }
+    #clear-chat-btn:hover { background:#1f2937; color:#9ca3af; }
     #msg-input:disabled { opacity:.4; cursor:not-allowed; }
+
+    #model-select {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: .72rem;
+      padding: 3px 6px 3px 8px;
+      cursor: pointer;
+      max-width: 160px;
+      -webkit-app-region: no-drag;
+    }
+    #model-select:focus { outline: none; border-color: var(--accent); }
+    #model-select option { background: #1a1a1a; }
 
     .win-controls { margin-left:auto; display:flex; gap:4px; -webkit-app-region:no-drag; }
     .win-controls button {
@@ -225,7 +264,12 @@
   <span id="status-label">Stopped</span>
   <span id="voice-pill"></span>
   <button id="start-btn">Start</button>
-  <button id="stop-btn" style="display:none">Stop</button>
+  <button id="stop-btn"      style="display:none">Stop</button>
+  <button id="interrupt-btn"   style="display:none">⏹ Interrupt</button>
+  <button id="clear-chat-btn" title="Clear conversation history">🗑 Clear</button>
+  <select id="model-select" title="Active model">
+    <option disabled selected>Loading models…</option>
+  </select>
   <div class="win-controls">
     <button id="btn-minimize" title="Minimize">&#8722;</button>
     <button id="btn-close"    title="Close">&#x2715;</button>
@@ -241,12 +285,13 @@
 
 <script>
 // ── Config ────────────────────────────────────────────────────────────────────
-const API_BASE = 'http://localhost:8000';
-const WS_URL   = 'ws://localhost:8000/ws';
+const API_BASE = 'http://127.0.0.1:8000';
+const WS_URL   = 'ws://127.0.0.1:8000/ws';
 
 // ── State ─────────────────────────────────────────────────────────────────────
 let conversationId      = null;   // set after first turn or history load
 let pendingTurn         = null;   // DOM node for the "thinking…" indicator
+let thinkingInterval    = null;   // setInterval ID for the animated dots
 let pendingVoiceWrapper = null;   // .turn wrapper rendered immediately on voice transcript
 let socket              = null;
 
@@ -293,16 +338,14 @@ function renderTurn(turn) {
 function showThinking() {
   pendingTurn = document.createElement("div");
   pendingTurn.className = "thinking";
-  const label = document.createTextNode("Charles is thinking");
-  const dots  = document.createElement("span");
-  dots.textContent = "…";
-  pendingTurn.appendChild(label);
-  pendingTurn.appendChild(dots);
+  pendingTurn.innerHTML =
+    'Charles is thinking <span class="wave-dots"><span></span><span></span><span></span></span>';
   $messages.appendChild(pendingTurn);
   scrollToBottom();
 }
 
 function clearThinking() {
+  if (thinkingInterval) { clearInterval(thinkingInterval); thinkingInterval = null; }
   if (pendingTurn) { pendingTurn.remove(); pendingTurn = null; }
 }
 
@@ -475,8 +518,10 @@ $input.addEventListener("input", () => {
   $input.focus();
 })();
 // Top bar DOM refs
-const $startBtn  = document.getElementById('start-btn');
-const $stopBtn   = document.getElementById('stop-btn');
+const $startBtn      = document.getElementById('start-btn');
+const $stopBtn       = document.getElementById('stop-btn');
+const $interruptBtn  = document.getElementById('interrupt-btn');
+const $clearChatBtn  = document.getElementById('clear-chat-btn');
 const $dot       = document.getElementById('status-dot');
 const $label     = document.getElementById('status-label');
 const $voicePill = document.getElementById('voice-pill');
@@ -502,14 +547,86 @@ function setStatus(state, message) {
 }
 
 function setVoiceState(state) {
-  const labels = { listening:'🎙 Listening', transcribing:'📝 Transcribing…', speaking:'🔊 Speaking', error:'Voice offline' };
-  $voicePill.className   = state;
-  $voicePill.textContent = labels[state] ?? '';
+  const DOTS = '<span class="wave-dots"><span></span><span></span><span></span></span>';
+  const labels = {
+    standby:      '💤 Say "Hey Charles"',
+    listening:    `🎙 Listening ${DOTS}`,
+    transcribing: `🎙 Listening ${DOTS}`,
+    speaking:     `🔊 Speaking ${DOTS}`,
+    error:        'Voice offline',
+  };
+  $voicePill.className = state;
+  $voicePill.innerHTML = labels[state] ?? '';
+  // Interrupt button only shows while Charles is speaking
+  $interruptBtn.style.display = (state === 'speaking') ? 'inline' : 'none';
+  // If voice returns to listening or standby, the previous turn is done —
+  // clear any stuck thinking bubble left over from an API error.
+  if (state === 'listening' || state === 'standby') clearThinking();
 }
 
 // IPC wiring — service controls
-$startBtn.addEventListener('click', () => window.electronAPI.start());
-$stopBtn.addEventListener('click',  () => window.electronAPI.stop());
+$startBtn.addEventListener('click',     () => window.electronAPI.start());
+$stopBtn.addEventListener('click',      () => window.electronAPI.stop());
+$interruptBtn.addEventListener('click', () => window.electronAPI.interrupt());
+
+// Clear chat — deletes the shared conversation from the API and wipes the UI
+$clearChatBtn.addEventListener('click', async () => {
+  if (!conversationId) {
+    document.getElementById('messages').innerHTML = '';
+    return;
+  }
+  try {
+    await fetch(`${API_BASE}/history/${conversationId}`, { method: 'DELETE' });
+  } catch (e) {
+    console.warn('Clear chat API call failed:', e);
+  }
+  // Wipe the UI and reset local state regardless of API outcome
+  document.getElementById('messages').innerHTML = '';
+  conversationId = null;
+});
+
+// ── Model selector ────────────────────────────────────────────────────────────
+const $modelSelect = document.getElementById('model-select');
+let modelSelectReady = false;
+
+async function initModelSelector() {
+  if (modelSelectReady) return;
+  try {
+    const [listRes, currentRes] = await Promise.all([
+      fetch(`${API_BASE}/models`),
+      fetch(`${API_BASE}/settings/model`),
+    ]);
+    const { models }       = await listRes.json();
+    const { model: active } = await currentRes.json();
+
+    $modelSelect.textContent = '';
+    for (const m of models) {
+      const opt = document.createElement('option');
+      opt.value       = m.id;
+      opt.textContent = m.name;
+      if (m.id === active) opt.selected = true;
+      $modelSelect.appendChild(opt);
+    }
+    // If the active model isn't in the returned list, prepend it so the
+    // UI always reflects the real selection (e.g. set via env var).
+    if ($modelSelect.value !== active) {
+      const opt = document.createElement('option');
+      opt.value = active; opt.textContent = active; opt.selected = true;
+      $modelSelect.insertBefore(opt, $modelSelect.firstChild);
+    }
+    modelSelectReady = true;
+  } catch {
+    $modelSelect.options[0].textContent = 'Model unavailable';
+  }
+}
+
+$modelSelect.addEventListener('change', () => {
+  fetch(`${API_BASE}/settings/model`, {
+    method:  'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ model: $modelSelect.value }),
+  });
+});
 
 // Window chrome controls (frameless window has no native buttons)
 document.getElementById('btn-minimize').addEventListener('click', () => window.electronAPI.minimize());
@@ -522,6 +639,7 @@ const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => 
     if (!socket || socket.readyState === WebSocket.CLOSED) {
       loadHistory().then(() => connectWebSocket());
     }
+    initModelSelector();
   }
 });
 const cleanupVoice      = window.electronAPI.onVoiceState(({ state }) => setVoiceState(state));

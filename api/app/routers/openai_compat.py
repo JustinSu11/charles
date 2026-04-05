@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db, AsyncSessionLocal
-from app.services.openrouter import OPENROUTER_API_KEY, MODEL, SYSTEM_PROMPT
+from app.services.openrouter import OPENROUTER_API_KEY, MODEL, BASE_SYSTEM_PROMPT as SYSTEM_PROMPT
 from app.services.conversation import (
     get_or_create_shared_conversation,
     fetch_history,

@@ -78,13 +78,19 @@ async def delete_history(conversation_id: str, db: AsyncSession = Depends(get_db
     )
     if not result.fetchone():
         raise HTTPException(status_code=404, detail="Conversation not found")
-    # Delete messages first (FK child), then the conversation row (FK parent)
+    # Delete messages first (FK child), then the conversation row (FK parent).
+    # Also clear the shared_conversation_id pointer so get_or_create_shared_conversation()
+    # generates a fresh UUID on the next request rather than returning a deleted ID.
     await db.execute(
         text("DELETE FROM messages WHERE conversation_id = :id"),
         {"id": conversation_id},
     )
     await db.execute(
         text("DELETE FROM conversations WHERE id = :id"),
+        {"id": conversation_id},
+    )
+    await db.execute(
+        text("DELETE FROM app_state WHERE key = 'shared_conversation_id' AND value = :id"),
         {"id": conversation_id},
     )
     await db.commit()
