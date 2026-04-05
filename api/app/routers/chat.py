@@ -64,15 +64,21 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     active_model = model_row[0] if model_row else None
 
     # 5. Route message to skills and fetch live data for any that activate.
-    #    Failures are caught per-skill so one bad external API call never
-    #    kills the whole request — Charles still replies, just without that data.
+    #    Each skill gets SKILL_TIMEOUT_SECS to fetch external data. If it
+    #    exceeds the budget or errors, Charles replies without that context
+    #    rather than blocking the whole request.
+    SKILL_TIMEOUT_SECS = 8.0
     activated = route_skills(request.message)
     skill_context: str | None = None
     if activated:
         skill_blocks = []
         for name in activated:
             try:
-                skill_blocks.append(await run_skill(name))
+                skill_blocks.append(
+                    await asyncio.wait_for(run_skill(name), timeout=SKILL_TIMEOUT_SECS)
+                )
+            except asyncio.TimeoutError:
+                _log.warning("Skill '%s' timed out after %.0fs — proceeding without it", name, SKILL_TIMEOUT_SECS)
             except Exception as exc:
                 _log.warning("Skill '%s' failed — proceeding without it: %s", name, exc)
         if skill_blocks:

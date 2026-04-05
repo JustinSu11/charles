@@ -59,7 +59,7 @@ async def fetch() -> list[dict]:
     if api_key:
         headers["apiKey"] = api_key
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(timeout=7.0) as client:
         resp = await client.get(NVD_BASE, params=params, headers=headers)
         resp.raise_for_status()
         data = resp.json()
