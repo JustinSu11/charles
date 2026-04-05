@@ -42,8 +42,43 @@ def _should_fetch_news(message: str) -> bool:
     return False
 
 
+def _should_fetch_cve(message: str) -> bool:
+    # TODO (your turn): implement CVE trigger detection
+    #
+    # Think about what a user would actually say to ask about vulnerabilities.
+    # Some things to consider:
+    #   - Direct CVE mentions: "CVE-2025-...", "latest CVEs", "any new CVEs?"
+    #   - Security/vuln vocabulary: "vulnerability", "exploit", "patch", "zero-day"
+    #   - Context matters: "security news" vs just "news" (news alone = tech_news skill)
+    #   - Recency signals: "recent", "latest", "this week" paired with security words
+    #
+    # Same three-tier pattern as _should_fetch_news works well here:
+    #   Tier 1 — exact/specific phrases that always mean CVE
+    #   Tier 2 — a main keyword + context word combo
+    #   Tier 3 — fallback broad match
+    #
+    # Aim for 8-12 lines. Return True if the message is asking about vulnerabilities.
+    # Tier 1 — "cve" mentioned at all: always a CVE request
+    if "cve" in message:
+        return True
+
+    # Tier 2 — vulnerability vocab paired with a recency/security context word
+    vuln_words = {"vulnerability", "vulnerabilities", "exploit", "zero-day", "patch", "patches"}
+    if any(word in message for word in vuln_words):
+        context_words = {"latest", "recent", "new", "today", "this week", "security"}
+        return any(word in message for word in context_words)
+
+    # Tier 3 — "security" + recency signal (without explicit vuln vocab)
+    if "security" in message:
+        recency_words = {"latest", "recent", "new", "today", "this week", "advisory"}
+        return any(word in message for word in recency_words)
+
+    return False
+
+
 _TRIGGER_MAP: dict[str, callable] = {
     "tech_news": _should_fetch_news,
+    "cve":       _should_fetch_cve,
 }
 
 # ── Router ────────────────────────────────────────────────────────────────────
