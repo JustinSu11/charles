@@ -188,9 +188,11 @@ def handle_wake(
     if result == "timeout":
         tts.speak("I didn't hear anything. Say 'Hey Charles' when you're ready.",
                   output_device_index=output_device_index)
+        print("VOICE_STATE:STANDBY", flush=True)
         return
 
     if result == "stop":
+        print("VOICE_STATE:STANDBY", flush=True)
         return
 
     # Conversation loop: stay active until silence timeout or stop phrase
@@ -207,6 +209,7 @@ def handle_wake(
             break
 
     logger.info("Conversation ended (reason: %s)", result)
+    print("VOICE_STATE:STANDBY", flush=True)
 
 
 # ── Startup ───────────────────────────────────────────────────────────────────
@@ -319,6 +322,19 @@ def main() -> None:
         f"device {input_dev}" if input_dev is not None else "system default",
         f"device {output_dev}" if output_dev is not None else "system default",
     )
+    print("VOICE_STATE:STANDBY", flush=True)
+
+    # Listen for INTERRUPT commands from Electron via stdin (non-blocking thread)
+    def _stdin_listener():
+        try:
+            for line in sys.stdin:
+                if line.strip().upper() == "INTERRUPT":
+                    logger.info("Interrupt received from GUI")
+                    tts.stop_speaking()
+                    print("VOICE_STATE:STANDBY", flush=True)
+        except Exception:
+            pass  # stdin closed on shutdown — expected
+    threading.Thread(target=_stdin_listener, daemon=True).start()
 
     # Wrap handle_wake so wake_word.run_forever() can call it without arguments
     def _on_wake():

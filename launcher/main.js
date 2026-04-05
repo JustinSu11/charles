@@ -145,7 +145,7 @@ async function startVoice() {
 
     const vproc = spawn('python', [voiceScript, '--no-preload'], {
       env: { ...process.env },
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],  // stdin piped so we can send INTERRUPT
     })
     voiceProcess = vproc
     vproc.stderr.on('data', (d) => process.stderr.write(`[Voice] ${d}`))
@@ -201,7 +201,13 @@ function registerIPC() {
     try { await startVoice(); return { ok: true } }
     catch (err) { return { ok: false, error: err.message } }
   })
-  ipcMain.handle('stop-services',   () => { stopVoice(); return { ok: true } })
+  ipcMain.handle('stop-services',    () => { stopVoice(); return { ok: true } })
+  ipcMain.handle('interrupt-voice',  () => {
+    if (voiceProcess?.stdin?.writable) {
+      voiceProcess.stdin.write('INTERRUPT\n')
+    }
+    return { ok: true }
+  })
   ipcMain.handle('minimize-window', () => mainWindow?.minimize())
   ipcMain.handle('close-window',    () => mainWindow?.close())
 }

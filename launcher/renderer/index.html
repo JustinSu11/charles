@@ -219,8 +219,10 @@
     #start-btn { background:var(--accent); color:#fff; border:none; border-radius:8px; padding:5px 14px; font-size:.8rem; font-weight:600; cursor:pointer; }
     #start-btn:hover:not(:disabled) { background:#1d4ed8; }
     #start-btn:disabled { background:#374151; color:#6b7280; cursor:not-allowed; }
-    #stop-btn  { background:#7f1d1d; color:#fca5a5; border:none; border-radius:8px; padding:5px 14px; font-size:.8rem; font-weight:600; cursor:pointer; }
+    #stop-btn      { background:#7f1d1d; color:#fca5a5; border:none; border-radius:8px; padding:5px 14px; font-size:.8rem; font-weight:600; cursor:pointer; }
     #stop-btn:hover { background:#991b1b; }
+    #interrupt-btn  { background:#1e3a5f; color:#93c5fd; border:none; border-radius:8px; padding:5px 14px; font-size:.8rem; font-weight:600; cursor:pointer; }
+    #interrupt-btn:hover { background:#1e40af; }
     #msg-input:disabled { opacity:.4; cursor:not-allowed; }
 
     #model-select {
@@ -259,7 +261,8 @@
   <span id="status-label">Stopped</span>
   <span id="voice-pill"></span>
   <button id="start-btn">Start</button>
-  <button id="stop-btn" style="display:none">Stop</button>
+  <button id="stop-btn"      style="display:none">Stop</button>
+  <button id="interrupt-btn" style="display:none">⏹ Interrupt</button>
   <select id="model-select" title="Active model">
     <option disabled selected>Loading models…</option>
   </select>
@@ -511,8 +514,9 @@ $input.addEventListener("input", () => {
   $input.focus();
 })();
 // Top bar DOM refs
-const $startBtn  = document.getElementById('start-btn');
-const $stopBtn   = document.getElementById('stop-btn');
+const $startBtn      = document.getElementById('start-btn');
+const $stopBtn       = document.getElementById('stop-btn');
+const $interruptBtn  = document.getElementById('interrupt-btn');
 const $dot       = document.getElementById('status-dot');
 const $label     = document.getElementById('status-label');
 const $voicePill = document.getElementById('voice-pill');
@@ -540,22 +544,25 @@ function setStatus(state, message) {
 function setVoiceState(state) {
   const DOTS = '<span class="wave-dots"><span></span><span></span><span></span></span>';
   const labels = {
-    listening:    '🎙 Listening',
+    standby:      '💤 Say "Hey Charles"',
+    listening:    `🎙 Listening ${DOTS}`,
     transcribing: `🎙 Listening ${DOTS}`,
     speaking:     `🔊 Speaking ${DOTS}`,
     error:        'Voice offline',
   };
   $voicePill.className = state;
   $voicePill.innerHTML = labels[state] ?? '';
-  // If voice returns to listening, the previous turn is fully done.
-  // Clear any stuck thinking bubble (e.g. when the API returned an error
-  // and no WebSocket turn message was broadcast to clear it normally).
-  if (state === 'listening') clearThinking();
+  // Interrupt button only shows while Charles is speaking
+  $interruptBtn.style.display = (state === 'speaking') ? 'inline' : 'none';
+  // If voice returns to listening or standby, the previous turn is done —
+  // clear any stuck thinking bubble left over from an API error.
+  if (state === 'listening' || state === 'standby') clearThinking();
 }
 
 // IPC wiring — service controls
-$startBtn.addEventListener('click', () => window.electronAPI.start());
-$stopBtn.addEventListener('click',  () => window.electronAPI.stop());
+$startBtn.addEventListener('click',     () => window.electronAPI.start());
+$stopBtn.addEventListener('click',      () => window.electronAPI.stop());
+$interruptBtn.addEventListener('click', () => window.electronAPI.interrupt());
 
 // ── Model selector ────────────────────────────────────────────────────────────
 const $modelSelect = document.getElementById('model-select');

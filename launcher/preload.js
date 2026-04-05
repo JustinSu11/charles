@@ -3,6 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
   start:       () => ipcRenderer.invoke('start-services'),
   stop:        () => ipcRenderer.invoke('stop-services'),
+  interrupt:   () => ipcRenderer.invoke('interrupt-voice'),
   minimize:    () => ipcRenderer.invoke('minimize-window'),
   closeWindow: () => ipcRenderer.invoke('close-window'),
   onStatusUpdate: (cb) => {
