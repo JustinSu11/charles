@@ -38,6 +38,10 @@ from dotenv import load_dotenv
 # ── Load .env before importing our modules (they read env at import time) ──────
 load_dotenv()
 
+# ── Ensure stdout is UTF-8 on Windows (default cp1252 can't encode Whisper output) ──
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8')
+
 import api_client
 import audio
 import stt

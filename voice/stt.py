@@ -86,6 +86,15 @@ def transcribe(audio: np.ndarray) -> str:
     text: str = result.get("text", "").strip()
     elapsed = time.perf_counter() - t0
     logger.info("Transcription (%.2f s): %r", elapsed, text)
+
+    # Whisper hallucinates multilingual garbage on near-silence — discard it.
+    # If more than 30% of characters are non-ASCII the output is not real speech.
+    if text:
+        non_ascii = sum(1 for c in text if ord(c) > 127)
+        if non_ascii / len(text) > 0.30:
+            logger.info("Transcription discarded — likely hallucination (%.0f%% non-ASCII)", 100 * non_ascii / len(text))
+            return ""
+
     return text
 
 
