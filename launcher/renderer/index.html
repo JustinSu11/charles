@@ -473,6 +473,9 @@ async function sendMessage() {
   $sendBtn.disabled = true;
   showThinking();
 
+  const controller = new AbortController();
+  const timeoutId  = setTimeout(() => controller.abort(), 120_000);
+
   try {
     const body = { message: text, interface: "web" };
     if (conversationId) body.conversation_id = conversationId;
@@ -481,6 +484,7 @@ async function sendMessage() {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify(body),
+      signal:  controller.signal,
     });
 
     if (!res.ok) {
@@ -491,8 +495,13 @@ async function sendMessage() {
     // On success the WS broadcast renders the turn — nothing more to do here.
   } catch (e) {
     clearThinking();
-    renderInfo(`Could not reach Charles API: ${e.message}`);
+    if (e.name === 'AbortError') {
+      renderInfo("The Charles API timed out. Please try again.");
+    } else {
+      renderInfo(`Could not reach Charles API: ${e.message}`);
+    }
   } finally {
+    clearTimeout(timeoutId);
     $sendBtn.disabled = false;
     $input.focus();
   }

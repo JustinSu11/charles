@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 API_BASE_URL: str = os.getenv("CHARLES_API_URL", "http://localhost:8000").rstrip("/")
-TIMEOUT: float = float(os.getenv("VOICE_TIMEOUT", "30"))
+TIMEOUT: float = float(os.getenv("VOICE_TIMEOUT", "120"))
 
 # ── State ─────────────────────────────────────────────────────────────────────
 
