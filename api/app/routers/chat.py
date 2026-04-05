@@ -87,7 +87,8 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
     # 6. Call OpenRouter
     try:
         assistant_reply = await get_openrouter_response(
-            history, model=active_model, skill_context=skill_context
+            history, model=active_model, skill_context=skill_context,
+            interface=request.interface,
         )
     except httpx.HTTPStatusError as e:
         status = e.response.status_code

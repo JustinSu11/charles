@@ -14,10 +14,19 @@ BASE_SYSTEM_PROMPT = (
     "When asked about vulnerabilities or security topics, be thorough but clear."
 )
 
+VOICE_BREVITY_PROMPT = (
+    "IMPORTANT: This request came from the voice interface. "
+    "Keep your reply to 2-3 sentences maximum — short enough to speak aloud naturally. "
+    "Lead with the single most important point. "
+    "The full details are visible in the GUI, so do not try to list everything."
+)
+
+
 async def get_openrouter_response(
     conversation_history: list[dict],
     model: str | None = None,
     skill_context: str | None = None,
+    interface: str = "web",
 ) -> str:
     """
     Send conversation history to OpenRouter and return the assistant reply.
@@ -27,6 +36,9 @@ async def get_openrouter_response(
                                representing the full conversation so far.
         model: OpenRouter model ID to use (e.g. "openai/gpt-4o").
                Falls back to the OPENROUTER_MODEL env var if not provided.
+        skill_context: Pre-fetched skill data to inject into the system prompt.
+        interface: "voice" or "web" — voice requests get a brevity instruction
+                   so the LLM generates short speakable responses.
     Returns:
         The assistant's reply as a plain string.
     Raises:
@@ -38,6 +50,8 @@ async def get_openrouter_response(
 
     from app.skills import get_skill_index
     system_prompt = BASE_SYSTEM_PROMPT + "\n\n" + get_skill_index()
+    if interface == "voice":
+        system_prompt += "\n\n" + VOICE_BREVITY_PROMPT
     if skill_context:
         system_prompt += "\n\n" + skill_context
 

@@ -111,6 +111,11 @@ def _one_turn(
     print("VOICE_STATE:LISTENING", flush=True)
     logger.info("Waiting for user to speak…")
 
+    # Brief pause so the new PyAudio input stream has time to initialise.
+    # Without this, the first ~150ms of speech is lost because the stream
+    # isn't ready when the user starts speaking right after the ack phrase.
+    time.sleep(0.2)
+
     audio_data = audio.record_until_silence(
         input_device_index=input_device_index,
         pre_speech_timeout=pre_speech_timeout,
