@@ -49,10 +49,9 @@ async def fetch() -> list[dict]:
     # NVD expects this exact ISO format (no microseconds, Z suffix)
     fmt = "%Y-%m-%dT%H:%M:%S.000"
     params = {
-        "pubStartDate": start.strftime(fmt),
-        "pubEndDate":   now.strftime(fmt),
+        "pubStartDate":   start.strftime(fmt),
+        "pubEndDate":     now.strftime(fmt),
         "resultsPerPage": _CVE_LIMIT,
-        "sortOrder":    "publishedDate",
     }
 
     headers = {}

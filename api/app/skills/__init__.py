@@ -13,7 +13,7 @@ chat.py uses it to:
   - Inject full instructions + fetched data only for active skills
 """
 
-from api.app.skills import tech_news, cve, virustotal
+from app.skills import tech_news, cve, virustotal
 
 # ── Registry ──────────────────────────────────────────────────────────────────
 # Maps skill name → module. Add new skills here and nowhere else.
