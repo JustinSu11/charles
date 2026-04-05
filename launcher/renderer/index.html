@@ -62,10 +62,10 @@
       padding: 20px 0;
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 20px;
     }
 
-    .turn { display: flex; flex-direction: column; gap: 0; }
+    .turn { display: flex; flex-direction: column; gap: 8px; }
 
     .bubble {
       max-width: min(680px, 90%);
@@ -151,6 +151,38 @@
       align-items: center;
       gap: 6px;
     }
+
+    /* ── Close dialog overlay ── */
+    #close-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #close-overlay.visible { display: flex; }
+    #close-dialog {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 24px 28px;
+      width: 300px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    #close-dialog h3 { font-size: .95rem; font-weight: 600; margin: 0; }
+    #close-dialog p  { font-size: .82rem; color: var(--text-muted); margin: 0; line-height: 1.5; }
+    .close-dialog-btns { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+    .close-dialog-btns button {
+      width: 100%; padding: 9px 0; border-radius: 8px;
+      font-size: .85rem; font-weight: 600; cursor: pointer; border: none;
+    }
+    #close-btn-tray { background: var(--accent); color: #fff; }
+    #close-btn-tray:hover { background: #2563eb; }
+    #close-btn-quit { background: #1f2937; color: #f87171; border: 1px solid #374151 !important; }
+    #close-btn-quit:hover { background: #7f1d1d; border-color: #991b1b !important; }
 
     /* ── Input bar ── */
     #input-bar {
@@ -281,6 +313,18 @@
 <div id="input-bar">
   <textarea id="msg-input" rows="1" placeholder="Message Charles…"></textarea>
   <button id="send-btn">Send</button>
+</div>
+
+<!-- Close dialog -->
+<div id="close-overlay">
+  <div id="close-dialog">
+    <h3>Close Charles?</h3>
+    <p>Minimize to the system tray to keep Charles running in the background, or quit to stop all services.</p>
+    <div class="close-dialog-btns">
+      <button id="close-btn-tray">Minimize to Tray</button>
+      <button id="close-btn-quit">Quit Charles</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -630,7 +674,23 @@ $modelSelect.addEventListener('change', () => {
 
 // Window chrome controls (frameless window has no native buttons)
 document.getElementById('btn-minimize').addEventListener('click', () => window.electronAPI.minimize());
-document.getElementById('btn-close').addEventListener('click',    () => window.electronAPI.closeWindow());
+
+// Close button — show dialog instead of closing immediately
+const $closeOverlay = document.getElementById('close-overlay');
+document.getElementById('btn-close').addEventListener('click', () => {
+  $closeOverlay.classList.add('visible');
+});
+// Click outside the dialog card → dismiss
+$closeOverlay.addEventListener('click', (e) => {
+  if (e.target === $closeOverlay) $closeOverlay.classList.remove('visible');
+});
+document.getElementById('close-btn-tray').addEventListener('click', () => {
+  $closeOverlay.classList.remove('visible');
+  window.electronAPI.closeWindow();
+});
+document.getElementById('close-btn-quit').addEventListener('click', () => {
+  window.electronAPI.quitApp();
+});
 
 const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => {
   setStatus(state, message);
