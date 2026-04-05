@@ -100,6 +100,13 @@ def send_message(text: str) -> str:
         logger.warning("Upstream timeout (504) from Charles API")
         return msg
 
+    if response.status_code == 404 and _conversation_id:
+        # The conversation was deleted (e.g. user hit Clear in the GUI).
+        # Drop the stale ID and retry once as a fresh conversation.
+        logger.warning("Conversation %s not found — resetting and retrying", _conversation_id)
+        _conversation_id = None
+        return send_message(text)
+
     if not response.ok:
         msg = f"Charles API returned an error: {response.status_code}."
         logger.error("Charles API error %d: %s", response.status_code, response.text[:200])

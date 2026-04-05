@@ -25,15 +25,18 @@ import asyncio
 import io
 import logging
 import os
+import queue
 import re
+import struct
 import threading
+import time
 import wave
 from typing import Optional
 
 import edge_tts
 import miniaudio
 
-from audio import play_wav_bytes
+from audio import play_wav_bytes, SAMPLE_RATE, CHUNK, DEFAULT_SILENCE_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +92,7 @@ def _clean_for_tts(text: str) -> str:
 
 _playback_lock = threading.Lock()
 _stop_playback = threading.Event()
+_playback_done = threading.Event()
 
 
 def stop_speaking() -> None:
@@ -99,6 +103,161 @@ def stop_speaking() -> None:
     mid-sentence immediately stops Charles and listens again.
     """
     _stop_playback.set()
+
+
+# ── Barge-in detection ────────────────────────────────────────────────────────
+
+# Barge-in is disabled by default because speaker audio bleeds into the
+# microphone and can exceed the energy threshold, causing Charles to interrupt
+# his own TTS playback.  Enable only after you have tuned BARGE_IN_THRESHOLD
+# high enough that speaker bleed does NOT trigger detection.
+#
+# To enable: add  BARGE_IN_ENABLED=true  to your .env file, then raise
+# BARGE_IN_THRESHOLD until false triggers stop (try 2500–4000).
+BARGE_IN_ENABLED: bool = os.getenv("BARGE_IN_ENABLED", "false").lower() in ("1", "true", "yes")
+
+# Higher than the normal recording threshold because the microphone picks up
+# some bleed from the speakers during playback.  Only relevant when enabled.
+BARGE_IN_THRESHOLD: float = float(os.getenv("BARGE_IN_THRESHOLD", "2500"))
+
+# Consecutive chunks above threshold required before we declare a barge-in.
+# 5 chunks × 512 samples / 16 000 Hz ≈ 160 ms — long enough to ignore clicks.
+_BARGE_IN_SUSTAIN: int = 5
+
+# Post-trigger silence chunks before capture stops (≈ 1.5 s).
+_BARGE_IN_SILENCE: int = int(1.5 * SAMPLE_RATE / CHUNK)
+
+# Single-slot queue: barge-in monitor deposits captured audio here;
+# main._one_turn() picks it up before opening a fresh mic stream.
+_barge_in_queue: queue.Queue = queue.Queue(maxsize=1)
+
+
+def _mic_rms(frame: bytes) -> float:
+    """RMS amplitude of a 16-bit PCM frame — mirrors audio._rms."""
+    count = len(frame) // 2
+    if count == 0:
+        return 0.0
+    shorts = struct.unpack(f"{count}h", frame)
+    return (sum(s * s for s in shorts) / count) ** 0.5
+
+
+def _barge_in_monitor(input_device_index: Optional[int]) -> None:
+    """
+    Run in a background thread during TTS playback.
+
+    Opens the microphone and monitors energy level.  If sustained speech
+    above BARGE_IN_THRESHOLD is detected:
+      1. Calls stop_speaking() to interrupt playback immediately.
+      2. Continues recording until silence, then deposits the audio in
+         _barge_in_queue so the conversation loop can transcribe it
+         without the user having to repeat themselves.
+
+    Exits automatically when _playback_done is set (normal playback end)
+    without having been triggered.
+    """
+    # Lazy imports — keep pyaudio initialisation out of module load time so
+    # it cannot affect the asyncio event loop used by edge-tts in the main thread.
+    import numpy as np
+    import pyaudio as _pa_mod
+
+    pa = _pa_mod.PyAudio()
+    kwargs: dict = dict(
+        format=_pa_mod.paInt16,
+        channels=1,
+        rate=SAMPLE_RATE,
+        input=True,
+        frames_per_buffer=CHUNK,
+    )
+    if input_device_index is not None:
+        kwargs["input_device_index"] = input_device_index
+
+    try:
+        stream = pa.open(**kwargs)
+        stream.start_stream()
+    except Exception as exc:
+        logger.warning("Barge-in monitor could not open mic: %s", exc)
+        pa.terminate()
+        return
+
+    # Rolling pre-roll buffer so we capture the beginning of the utterance
+    # even before the sustain check fires.
+    pre_roll: list[bytes] = []
+    post_frames: list[bytes] = []
+    sustained: int = 0
+    triggered: bool = False
+    silent_chunks: int = 0
+
+    try:
+        while True:
+            # Check the stop condition before attempting a read.
+            # If playback finished and we were never triggered, exit cleanly.
+            if _playback_done.is_set() and not triggered:
+                return
+
+            # Non-blocking poll: only read when a full chunk is ready.
+            # This prevents stream.read() from blocking indefinitely, which
+            # would delay the _playback_done check above by up to one frame.
+            if stream.get_read_available() < CHUNK:
+                time.sleep(0.01)
+                continue
+
+            frame = stream.read(CHUNK, exception_on_overflow=False)
+            rms = _mic_rms(frame)
+
+            if not triggered:
+                # Keep a short pre-roll so the start of the utterance isn't cut off
+                pre_roll.append(frame)
+                if len(pre_roll) > _BARGE_IN_SUSTAIN + 4:
+                    pre_roll.pop(0)
+
+                if rms >= BARGE_IN_THRESHOLD:
+                    sustained += 1
+                    if sustained >= _BARGE_IN_SUSTAIN:
+                        triggered = True
+                        stop_speaking()
+                        logger.info("Barge-in detected (RMS %.0f) — interrupting TTS", rms)
+                else:
+                    sustained = 0
+            else:
+                # Post-trigger: capture until natural silence
+                post_frames.append(frame)
+                if rms < DEFAULT_SILENCE_THRESHOLD:
+                    silent_chunks += 1
+                    if silent_chunks >= _BARGE_IN_SILENCE:
+                        break
+                else:
+                    silent_chunks = 0
+    finally:
+        stream.stop_stream()
+        stream.close()
+        pa.terminate()
+
+    if triggered:
+        all_frames = pre_roll + post_frames
+        if all_frames:
+            raw = b"".join(all_frames)
+            audio_int16 = np.frombuffer(raw, dtype=np.int16)
+            audio_f32 = audio_int16.astype(np.float32) / 32768.0
+            try:
+                _barge_in_queue.put_nowait(audio_f32)
+                logger.info("Barge-in audio captured (%d frames → %.1f s)",
+                            len(all_frames), len(all_frames) * CHUNK / SAMPLE_RATE)
+            except queue.Full:
+                logger.debug("Barge-in queue full — discarding audio")
+
+
+def get_barge_in_audio() -> Optional[np.ndarray]:
+    """
+    Return audio captured by the barge-in monitor, or None.
+
+    Called by main._one_turn() before opening a fresh microphone stream.
+    If barge-in audio is available the caller should use it directly and
+    skip record_until_silence() so the user does not need to repeat themselves.
+    """
+    try:
+        return _barge_in_queue.get_nowait()
+    except queue.Empty:
+        return None
 
 
 # ── Audio generation ──────────────────────────────────────────────────────────
@@ -135,6 +294,8 @@ def _mp3_to_wav(mp3_bytes: bytes) -> bytes:
 def speak(
     text: str,
     output_device_index: Optional[int] = None,
+    input_device_index: Optional[int] = None,
+    barge_in: bool = False,
 ) -> None:
     """
     Convert *text* to speech and play it through the speakers.
@@ -148,11 +309,20 @@ def speak(
         ``_clean_for_tts`` before the text is sent to the TTS engine.
     output_device_index
         Speaker device index.  None → system default.
+    input_device_index
+        Microphone device index for barge-in monitoring.  None → system default.
+        Only relevant when ``barge_in=True``.
+    barge_in
+        When True, a background thread monitors the microphone during playback.
+        If the user starts speaking, playback stops immediately and the captured
+        audio is made available via ``get_barge_in_audio()``.  Default False —
+        only enable for substantive replies, not short ack/error phrases.
     """
     if not text or not text.strip():
         return
 
     _stop_playback.clear()
+    _playback_done.clear()
     clean = _clean_for_tts(text)
 
     if not clean:
@@ -161,6 +331,7 @@ def speak(
     logger.info("Speaking: %r", clean[:80])
 
     with _playback_lock:
+        monitor_thread: Optional[threading.Thread] = None
         try:
             mp3_bytes = asyncio.run(_generate_mp3(clean))
 
@@ -169,10 +340,34 @@ def speak(
                 return
 
             wav_bytes = _mp3_to_wav(mp3_bytes)
-            play_wav_bytes(wav_bytes, output_device_index=output_device_index)
+
+            # Only start the barge-in monitor for full replies and only when
+            # the feature is explicitly enabled (opt-in to avoid speaker bleed
+            # false-triggering on default hardware setups).
+            if barge_in and BARGE_IN_ENABLED:
+                monitor_thread = threading.Thread(
+                    target=_barge_in_monitor,
+                    args=(input_device_index,),
+                    daemon=True,
+                    name="barge-in-monitor",
+                )
+                monitor_thread.start()
+
+            play_wav_bytes(
+                wav_bytes,
+                output_device_index=output_device_index,
+                stop_event=_stop_playback,
+            )
 
         except Exception as exc:
             logger.error("TTS error: %s", exc, exc_info=True)
+        finally:
+            # Signal the monitor that playback has ended (triggered or not).
+            _playback_done.set()
+            # Wait for the monitor to finish capturing the barge-in utterance.
+            # Timeout of 8 s covers the longest expected spoken response.
+            if monitor_thread and monitor_thread.is_alive():
+                monitor_thread.join(timeout=8.0)
 
 
 def preload() -> None:

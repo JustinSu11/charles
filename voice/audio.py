@@ -16,6 +16,7 @@ Cross-platform:
 from __future__ import annotations
 
 import os
+import threading
 import time
 import wave
 import io
@@ -260,9 +261,88 @@ def record_until_silence(
     return audio_int16.astype(np.float32) / 32768.0
 
 
+# ── Thinking chime ───────────────────────────────────────────────────────────
+
+def _make_tone(freq: float, duration_ms: int, sample_rate: int = 24_000,
+               amplitude: float = 0.35) -> np.ndarray:
+    """
+    Generate a single sine-wave tone with a short fade-in and fade-out.
+
+    Returns a float32 array normalised to [-1.0, 1.0].
+    The fade prevents clicking at the start/end of each note.
+    """
+    n = int(sample_rate * duration_ms / 1000)
+    t = np.linspace(0, duration_ms / 1000, n, endpoint=False)
+    wave = np.sin(2 * np.pi * freq * t).astype(np.float32)
+
+    # 10 ms fade-in / fade-out to avoid clicks
+    fade_n = min(int(sample_rate * 0.01), n // 4)
+    fade_in  = np.linspace(0.0, 1.0, fade_n, dtype=np.float32)
+    fade_out = np.linspace(1.0, 0.0, fade_n, dtype=np.float32)
+    wave[:fade_n]  *= fade_in
+    wave[-fade_n:] *= fade_out
+
+    return wave * amplitude
+
+
+def _pcm_to_wav_bytes(samples: np.ndarray, sample_rate: int = 24_000) -> bytes:
+    """Convert a float32 numpy array to WAV bytes (16-bit mono)."""
+    pcm = (samples * 32767).clip(-32768, 32767).astype(np.int16)
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm.tobytes())
+    return buf.getvalue()
+
+
+def play_thinking_chime(output_device_index: Optional[int] = None) -> None:
+    """
+    Play a soft, warm pad tone to signal that Charles is processing.
+
+    Designed to be subtle and non-intrusive — a single note built from
+    layered harmonics (fundamental + 2nd + 3rd) with a slow fade-in and
+    long decay, similar to ChatGPT's processing sound.
+
+    The tone is quiet and round rather than sharp — the user hears
+    "I got that" without being startled.
+    """
+    SR = 24_000
+    FREQ = 520.0          # just above C5 — warm, readable on laptop speakers
+    DURATION_MS = 380
+    n = int(SR * DURATION_MS / 1000)
+    t = np.linspace(0, DURATION_MS / 1000, n, endpoint=False, dtype=np.float32)
+
+    # Layer harmonics for a round, pad-like timbre instead of a thin sine beep
+    fundamental = np.sin(2 * np.pi * FREQ * t)
+    harmonic2   = np.sin(2 * np.pi * FREQ * 2 * t) * 0.30
+    harmonic3   = np.sin(2 * np.pi * FREQ * 3 * t) * 0.12
+    tone = (fundamental + harmonic2 + harmonic3).astype(np.float32)
+
+    # Smooth envelope: slow attack (~25% of duration), then exponential decay
+    attack_n = int(n * 0.25)
+    envelope = np.ones(n, dtype=np.float32)
+    envelope[:attack_n] = np.linspace(0.0, 1.0, attack_n)
+    # Exponential decay over the remaining 75%
+    decay_n = n - attack_n
+    envelope[attack_n:] = np.exp(-3.5 * np.linspace(0, 1, decay_n)).astype(np.float32)
+
+    tone = tone * envelope * 0.22   # keep it subtle — low master amplitude
+
+    try:
+        play_wav_bytes(_pcm_to_wav_bytes(tone, SR), output_device_index=output_device_index)
+    except Exception as exc:
+        logger.debug("Thinking chime failed: %s", exc)
+
+
 # ── Playback ──────────────────────────────────────────────────────────────────
 
-def play_wav_bytes(wav_bytes: bytes, output_device_index: Optional[int] = None) -> None:
+def play_wav_bytes(
+    wav_bytes: bytes,
+    output_device_index: Optional[int] = None,
+    stop_event: Optional[threading.Event] = None,
+) -> None:
     """
     Play raw WAV-format bytes through the speakers.
 
@@ -274,6 +354,10 @@ def play_wav_bytes(wav_bytes: bytes, output_device_index: Optional[int] = None) 
         Complete WAV file as bytes (including the RIFF header).
     output_device_index
         Pass None to use the system default output device.
+    stop_event
+        Optional ``threading.Event``.  When set, playback stops cleanly
+        after the current chunk finishes — used for barge-in and wake-word
+        interruption mid-sentence.
     """
     buf = io.BytesIO(wav_bytes)
     with wave.open(buf, "rb") as wf:
@@ -292,6 +376,8 @@ def play_wav_bytes(wav_bytes: bytes, output_device_index: Optional[int] = None) 
             chunk = 1024
             data = wf.readframes(chunk)
             while data:
+                if stop_event and stop_event.is_set():
+                    break
                 stream.write(data)
                 data = wf.readframes(chunk)
         finally:

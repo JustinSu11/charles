@@ -111,15 +111,24 @@ def _one_turn(
     print("VOICE_STATE:LISTENING", flush=True)
     logger.info("Waiting for user to speak…")
 
-    # Brief pause so the new PyAudio input stream has time to initialise.
-    # Without this, the first ~150ms of speech is lost because the stream
-    # isn't ready when the user starts speaking right after the ack phrase.
-    time.sleep(0.2)
+    # Check whether the barge-in monitor captured speech during the previous
+    # TTS reply.  If so, skip opening a new mic stream entirely — the user's
+    # words are already in hand and they don't need to repeat themselves.
+    barge_in_audio = tts.get_barge_in_audio()
+    if barge_in_audio is not None and len(barge_in_audio) >= 1600:
+        logger.info("Using barge-in audio (%d samples, %.1f s)",
+                    len(barge_in_audio), len(barge_in_audio) / 16_000)
+        audio_data = barge_in_audio
+    else:
+        # Brief pause so the new PyAudio input stream has time to initialise.
+        # Without this, the first ~150ms of speech is lost because the stream
+        # isn't ready when the user starts speaking right after the ack phrase.
+        time.sleep(0.2)
 
-    audio_data = audio.record_until_silence(
-        input_device_index=input_device_index,
-        pre_speech_timeout=pre_speech_timeout,
-    )
+        audio_data = audio.record_until_silence(
+            input_device_index=input_device_index,
+            pre_speech_timeout=pre_speech_timeout,
+        )
 
     if audio_data is None or len(audio_data) < 1600:
         return "timeout"
@@ -149,13 +158,25 @@ def _one_turn(
     # Emit transcript immediately so the GUI can show it before the API responds
     print(f"VOICE_TRANSCRIPT:{text}", flush=True)
 
+    # Play a short thinking chime in the background so the user hears
+    # immediate confirmation that their speech was captured.  The chime
+    # (~470 ms) runs concurrently with the API call — zero added latency.
+    threading.Thread(
+        target=audio.play_thinking_chime,
+        kwargs={"output_device_index": output_device_index},
+        daemon=True,
+        name="thinking-chime",
+    ).start()
+
     # Send to Charles API
     reply = api_client.send_message(text)
 
-    # Speak reply (interruptible via wake word — stop_speaking() is called
-    # by the wake word thread if the user says "Hey Charles" mid-reply)
+    # Speak reply — barge-in enabled so the user can interrupt naturally.
+    # barge_in=True activates the background monitor that watches the mic
+    # and stops playback if the user starts talking mid-sentence.
     print("VOICE_STATE:SPEAKING", flush=True)
-    tts.speak(reply, output_device_index=output_device_index)
+    tts.speak(reply, output_device_index=output_device_index,
+              input_device_index=input_device_index, barge_in=True)
 
     return "continue"
 

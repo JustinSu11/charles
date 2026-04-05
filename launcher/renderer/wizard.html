@@ -232,6 +232,13 @@
         <span class="hint">Free key at <a id="link-picovoice">console.picovoice.ai</a> — needed so the "Hey Charles" SDK can run</span>
       </div>
 
+      <!-- VirusTotal key (optional) -->
+      <div class="field">
+        <label>VirusTotal API Key <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>
+        <input type="password" id="input-virustotal" placeholder="Leave blank to skip" autocomplete="off" spellcheck="false" />
+        <span class="hint">Free at <a id="link-virustotal">virustotal.com</a> — enables Charles to report whether a file or URL is malicious</span>
+      </div>
+
       <div class="key-status" id="key-status"></div>
     </div>
 
@@ -360,6 +367,7 @@ $next.addEventListener('click', async () => {
   if (current === 3) {
     const openrouterKey = document.getElementById('input-openrouter-key').value.trim()
     const pvKey         = document.getElementById('input-picovoice').value.trim()
+    const vtKey         = document.getElementById('input-virustotal').value.trim()
 
     if (!openrouterKey) {
       setKeyStatus('⚠️', 'OpenRouter API key is required.', 'fail')
@@ -380,8 +388,9 @@ $next.addEventListener('click', async () => {
       return
     }
 
-    await window.wizardAPI.saveKeys({ openrouterKey, picovoiceKey: pvKey })
-    setKeyStatus('✅', 'All set — keys saved', 'ok')
+    await window.wizardAPI.saveKeys({ openrouterKey, picovoiceKey: pvKey, virustotalKey: vtKey })
+    const vtNote = vtKey ? '' : ' (VirusTotal skipped)'
+    setKeyStatus('✅', `All set — keys saved${vtNote}`, 'ok')
     markStep(3, true)
   }
 
@@ -394,6 +403,9 @@ document.getElementById('btn-close').addEventListener('click', () => window.wiza
 // External links — must go via main process shell.openExternal (window.open opens an Electron window)
 document.getElementById('link-picovoice').addEventListener('click', () => {
   window.wizardAPI.openExternal('https://console.picovoice.ai/')
+})
+document.getElementById('link-virustotal').addEventListener('click', () => {
+  window.wizardAPI.openExternal('https://www.virustotal.com/gui/sign-in')
 })
 
 // ── Boot ───────────────────────────────────────────────────────────────────────

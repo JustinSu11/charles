@@ -96,8 +96,8 @@ function _registerHandlers(onComplete) {
     return validatePicovoiceKey(picovoiceKey)
   })
 
-  // ── Step 3c: save both keys to .env ───────────────────────────────────────
-  ipcMain.handle('wizard:save-keys', (_, { openrouterKey, picovoiceKey }) => {
+  // ── Step 3c: save keys to .env ────────────────────────────────────────────
+  ipcMain.handle('wizard:save-keys', (_, { openrouterKey, picovoiceKey, virustotalKey }) => {
     const envPath = path.join(projectRoot, '.env')
     let content = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
 
@@ -107,8 +107,12 @@ function _registerHandlers(onComplete) {
       return re.test(src) ? src.replace(re, line) : `${src}\n${line}`
     }
 
-    content = upsert(content, 'OPENROUTER_API_KEY',  openrouterKey)
-    content = upsert(content, 'PICOVOICE_ACCESS_KEY', picovoiceKey)
+    content = upsert(content, 'OPENROUTER_API_KEY',   openrouterKey)
+    content = upsert(content, 'PICOVOICE_ACCESS_KEY',  picovoiceKey)
+    // Only write VirusTotal key if the user provided one
+    if (virustotalKey) {
+      content = upsert(content, 'VIRUSTOTAL_API_KEY', virustotalKey)
+    }
     fs.writeFileSync(envPath, content.trim() + '\n', 'utf8')
     return { ok: true }
   })
@@ -127,7 +131,11 @@ function _registerHandlers(onComplete) {
 
   // Utility: open a URL in the system browser from renderer code
   ipcMain.handle('wizard:open-external', (_, url) => {
-    const allowed = ['https://console.picovoice.ai/', 'https://openrouter.ai/keys']
+    const allowed = [
+      'https://console.picovoice.ai/',
+      'https://openrouter.ai/keys',
+      'https://www.virustotal.com/gui/sign-in',
+    ]
     if (allowed.some(prefix => url.startsWith(prefix))) shell.openExternal(url)
   })
 }

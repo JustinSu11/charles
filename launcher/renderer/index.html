@@ -211,6 +211,7 @@
     #status-label { font-size:.8rem; color:var(--text-muted); flex:1; }
 
     #voice-pill { font-size:.72rem; padding:2px 8px; border-radius:999px; display:none; }
+    #voice-pill.standby      { display:inline; background:#1c2330; color:#6b7280; }
     #voice-pill.listening    { display:inline; background:#2e1065; color:#a78bfa; }
     #voice-pill.transcribing { display:inline; background:#1f2937; color:#9ca3af; }
     #voice-pill.speaking     { display:inline; background:#431407; color:#fb923c; }
@@ -223,6 +224,8 @@
     #stop-btn:hover { background:#991b1b; }
     #interrupt-btn  { background:#1e3a5f; color:#93c5fd; border:none; border-radius:8px; padding:5px 14px; font-size:.8rem; font-weight:600; cursor:pointer; }
     #interrupt-btn:hover { background:#1e40af; }
+    #clear-chat-btn { background:transparent; color:#4b5563; border:1px solid #2a2a2a; border-radius:8px; padding:5px 14px; font-size:.8rem; cursor:pointer; }
+    #clear-chat-btn:hover { background:#1f2937; color:#9ca3af; }
     #msg-input:disabled { opacity:.4; cursor:not-allowed; }
 
     #model-select {
@@ -262,7 +265,8 @@
   <span id="voice-pill"></span>
   <button id="start-btn">Start</button>
   <button id="stop-btn"      style="display:none">Stop</button>
-  <button id="interrupt-btn" style="display:none">⏹ Interrupt</button>
+  <button id="interrupt-btn"   style="display:none">⏹ Interrupt</button>
+  <button id="clear-chat-btn" title="Clear conversation history">🗑 Clear</button>
   <select id="model-select" title="Active model">
     <option disabled selected>Loading models…</option>
   </select>
@@ -517,6 +521,7 @@ $input.addEventListener("input", () => {
 const $startBtn      = document.getElementById('start-btn');
 const $stopBtn       = document.getElementById('stop-btn');
 const $interruptBtn  = document.getElementById('interrupt-btn');
+const $clearChatBtn  = document.getElementById('clear-chat-btn');
 const $dot       = document.getElementById('status-dot');
 const $label     = document.getElementById('status-label');
 const $voicePill = document.getElementById('voice-pill');
@@ -563,6 +568,22 @@ function setVoiceState(state) {
 $startBtn.addEventListener('click',     () => window.electronAPI.start());
 $stopBtn.addEventListener('click',      () => window.electronAPI.stop());
 $interruptBtn.addEventListener('click', () => window.electronAPI.interrupt());
+
+// Clear chat — deletes the shared conversation from the API and wipes the UI
+$clearChatBtn.addEventListener('click', async () => {
+  if (!conversationId) {
+    document.getElementById('messages').innerHTML = '';
+    return;
+  }
+  try {
+    await fetch(`${API_BASE}/history/${conversationId}`, { method: 'DELETE' });
+  } catch (e) {
+    console.warn('Clear chat API call failed:', e);
+  }
+  // Wipe the UI and reset local state regardless of API outcome
+  document.getElementById('messages').innerHTML = '';
+  conversationId = null;
+});
 
 // ── Model selector ────────────────────────────────────────────────────────────
 const $modelSelect = document.getElementById('model-select');

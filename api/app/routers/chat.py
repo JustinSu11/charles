@@ -75,7 +75,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)):
         for name in activated:
             try:
                 skill_blocks.append(
-                    await asyncio.wait_for(run_skill(name), timeout=SKILL_TIMEOUT_SECS)
+                    await asyncio.wait_for(run_skill(name, request.message), timeout=SKILL_TIMEOUT_SECS)
                 )
             except asyncio.TimeoutError:
                 _log.warning("Skill '%s' timed out after %.0fs — proceeding without it", name, SKILL_TIMEOUT_SECS)
