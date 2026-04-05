@@ -36,7 +36,7 @@ async def get_openrouter_response(
     if not OPENROUTER_API_KEY:
         raise ValueError("OPENROUTER_API_KEY is not set in environment")
 
-    from api.app.skills import get_skill_index
+    from app.skills import get_skill_index
     system_prompt = BASE_SYSTEM_PROMPT + "\n\n" + get_skill_index()
     if skill_context:
         system_prompt += "\n\n" + skill_context

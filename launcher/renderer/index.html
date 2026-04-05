@@ -547,6 +547,10 @@ function setVoiceState(state) {
   };
   $voicePill.className = state;
   $voicePill.innerHTML = labels[state] ?? '';
+  // If voice returns to listening, the previous turn is fully done.
+  // Clear any stuck thinking bubble (e.g. when the API returned an error
+  // and no WebSocket turn message was broadcast to clear it normally).
+  if (state === 'listening') clearThinking();
 }
 
 // IPC wiring — service controls
