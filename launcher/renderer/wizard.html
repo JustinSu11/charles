@@ -129,6 +129,7 @@
       font-size: .8rem; padding: 8px 12px; border-radius: 6px;
       border: 1px solid var(--border); min-height: 36px;
       display: none; align-items: center; gap: 8px;
+      margin-bottom: 12px;
     }
     .key-status.ok   { border-color: #166534; background: #14532d22; color: var(--success); display: flex; }
     .key-status.fail { border-color: #991b1b; background: #7f1d1d22; color: var(--error);   display: flex; }
@@ -224,6 +225,8 @@
       <h2>Connect Accounts</h2>
       <p>Charles needs two things: an AI provider and a wake word licence. Both are free.</p>
 
+      <div class="key-status" id="key-status"></div>
+
       <!-- OpenRouter API key -->
       <div class="field">
         <label>AI Provider — OpenRouter API Key</label>
@@ -245,7 +248,6 @@
         <span class="hint">Free at <a id="link-virustotal">virustotal.com</a> — enables Charles to report whether a file or URL is malicious</span>
       </div>
 
-      <div class="key-status" id="key-status"></div>
     </div>
 
     <!-- Step 4: Done -->
