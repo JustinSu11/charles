@@ -12,13 +12,13 @@
  */
 
 const { BrowserWindow, ipcMain, app, shell } = require('electron')
-const path    = require('path')
-const fs      = require('fs')
+const path = require('path')
+const fs = require('fs')
 const { spawn } = require('child_process')
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 
-const projectRoot   = path.join(__dirname, '..')
+const projectRoot = path.join(__dirname, '..')
 const setupFlagPath = path.join(app.getPath('userData'), 'setup_complete')
 
 // ── Window ────────────────────────────────────────────────────────────────────
@@ -61,7 +61,7 @@ function _registerHandlers(onComplete) {
       if (major < 3 || (major === 3 && minor < 10)) {
         return resolve({ ok: false, version, error: `Python ${version} found but 3.10–3.12 is required.` })
       }
-      if (major > 3 || (major === 3 && minor > 12)) {
+      if (major > 3 || (major === 3 && minor > 13)) {
         return resolve({
           ok: false, version,
           error: `Python ${version} is not yet supported. Please install Python 3.11 or 3.12 from python.org.`,
@@ -87,7 +87,7 @@ function _registerHandlers(onComplete) {
     })
 
     try {
-      await runPip('Installing API dependencies…',   path.join(projectRoot, 'api',   'requirements.txt'))
+      await runPip('Installing API dependencies…', path.join(projectRoot, 'api', 'requirements.txt'))
       send('\n⚠  Installing voice dependencies — torch (~2 GB) will download on first run.\n    This step can take several minutes on a slow connection. Please wait…\n')
       await runPip('Installing voice dependencies…', path.join(projectRoot, 'voice', 'requirements.txt'))
       send('\n✓  All dependencies installed successfully.\n')
@@ -114,8 +114,8 @@ function _registerHandlers(onComplete) {
       return re.test(src) ? src.replace(re, line) : `${src}\n${line}`
     }
 
-    content = upsert(content, 'OPENROUTER_API_KEY',   openrouterKey)
-    content = upsert(content, 'PICOVOICE_ACCESS_KEY',  picovoiceKey)
+    content = upsert(content, 'OPENROUTER_API_KEY', openrouterKey)
+    content = upsert(content, 'PICOVOICE_ACCESS_KEY', picovoiceKey)
     // Only write VirusTotal key if the user provided one
     if (virustotalKey) {
       content = upsert(content, 'VIRUSTOTAL_API_KEY', virustotalKey)
@@ -149,9 +149,9 @@ function _registerHandlers(onComplete) {
 
 function _removeHandlers() {
   for (const ch of ['wizard:check-python', 'wizard:install-deps',
-                     'wizard:validate-picovoice',
-                     'wizard:save-keys', 'wizard:finish', 'wizard:close',
-                     'wizard:open-external']) {
+    'wizard:validate-picovoice',
+    'wizard:save-keys', 'wizard:finish', 'wizard:close',
+    'wizard:open-external']) {
     ipcMain.removeHandler(ch)
   }
 }
