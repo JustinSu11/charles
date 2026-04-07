@@ -1,32 +1,33 @@
 """
-wake_word.py — Porcupine multi-keyword wake word detection.
+wake_word.py — OpenWakeWord multi-model wake word detection.
 
-Porcupine runs on-device (no network call) with very low CPU overhead.
-It processes 16 kHz mono audio in fixed-size frames and fires a callback
-when ANY of the loaded wake words are detected.
+OpenWakeWord is a fully open-source, Apache-2.0-licensed wake word engine.
+No API key or account required.
 
 Multiple wake words
 -------------------
-Drop any number of .ppn model files into voice/models/ and all are loaded
-simultaneously.  Porcupine fires on whichever one it hears first.
+Place any number of .onnx model files in voice/models/ and all are loaded
+simultaneously.  OpenWakeWord fires on whichever model scores above the
+threshold first.
 
-Recommended setup — generate both of these at https://console.picovoice.ai/ppn
-(select your OS platform for each):
+Recommended setup — place trained .onnx files here:
 
-    voice/models/hey-charles.ppn   ← "Hey Charles"
-    voice/models/charles.ppn       ← "Charles"
+    voice/models/hey-charles.onnx   ← "Hey Charles"
+    voice/models/charles.onnx       ← "Charles" (optional variant)
 
-Sensitivity
------------
-WAKE_WORD_SENSITIVITY in .env applies to all models uniformly (0.0–1.0).
-To set per-model sensitivities, set WAKE_WORD_SENSITIVITIES as a comma-
-separated list in the same order that models are discovered (alphabetical):
-    WAKE_WORD_SENSITIVITIES=0.5,0.6
+See documentation/adding-openwakeword-model.md for instructions.
 
 Fallback
 --------
-If no .ppn files exist the detector falls back to Picovoice's built-in
-"porcupine" keyword so the service still starts during development.
+If no .onnx files are found, the detector falls back to the built-in
+'hey_jarvis' model so the service still starts during development or before
+a custom "Hey Charles" model has been trained.
+
+Threshold
+---------
+WAKE_WORD_THRESHOLD in .env sets the detection threshold (0.0–1.0).
+Higher values = fewer false positives but may miss quiet detections.
+Default: 0.5
 """
 
 from __future__ import annotations
@@ -37,10 +38,12 @@ import time
 from pathlib import Path
 from typing import Callable, Optional
 
-import pvporcupine
+import numpy as np
 from dotenv import load_dotenv
+import openwakeword
+from openwakeword.model import Model
 
-from audio import MicrophoneStream, CHUNK
+from audio import MicrophoneStream
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -50,41 +53,67 @@ logger = logging.getLogger(__name__)
 _VOICE_DIR = Path(__file__).parent
 _MODELS_DIR = _VOICE_DIR / "models"
 
-ACCESS_KEY: str = os.getenv("PICOVOICE_ACCESS_KEY", "")
+# Detection threshold applied to every loaded model (0.0–1.0).
+THRESHOLD: float = float(os.getenv("WAKE_WORD_THRESHOLD", "0.5"))
 
-# Default sensitivity applied to every model unless overridden.
-SENSITIVITY: float = float(os.getenv("WAKE_WORD_SENSITIVITY", "0.5"))
+# OpenWakeWord requires 1280-sample frames (80 ms at 16 kHz).
+# audio.py uses CHUNK=512, so frames are accumulated here without touching
+# the shared audio pipeline.
+_OWW_FRAME_SAMPLES = 1280
+
+
+# ── OWW internal model names — never treated as wake word models ──────────────
+# OpenWakeWord's preprocessing pipeline requires melspectrogram.onnx and
+# embedding_model.onnx.  These live inside the openwakeword package resources
+# directory, but some distributions / manual installs place them elsewhere.
+# We explicitly exclude them so _discover_models never picks them up by accident.
+_OWW_INTERNAL_MODELS = {"melspectrogram", "embedding_model"}
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def _ensure_oww_models() -> None:
+    """
+    Download OpenWakeWord's internal preprocessing models if not already present.
+
+    OWW requires melspectrogram.onnx and embedding_model.onnx in its resource
+    directory before any Model() can be instantiated.  Calling download_models()
+    is a no-op if the files already exist.
+    """
+    try:
+        openwakeword.utils.download_models()
+    except Exception as exc:
+        logger.warning("Could not download OWW preprocessing models: %s", exc)
+
+
 def _discover_models() -> list[Path]:
-    """Return all .ppn files in voice/models/, sorted alphabetically."""
+    """Return wake-word .onnx files in voice/models/, excluding OWW internals."""
     if not _MODELS_DIR.exists():
         return []
-    return sorted(_MODELS_DIR.glob("*.ppn"))
+    return sorted(
+        p for p in _MODELS_DIR.glob("*.onnx")
+        if p.stem not in _OWW_INTERNAL_MODELS
+    )
 
 
-def _keyword_label(path: Path) -> str:
-    """Derive a human-readable label from a .ppn filename, e.g. 'hey-charles'."""
-    return path.stem  # strips .ppn extension
-
-
-def _build_sensitivities(count: int) -> list[float]:
-    """
-    Build a per-model sensitivity list.
-
-    Reads WAKE_WORD_SENSITIVITIES (comma-separated) first; falls back to
-    repeating WAKE_WORD_SENSITIVITY for all models.
-    """
-    raw = os.getenv("WAKE_WORD_SENSITIVITIES", "")
-    if raw:
-        parts = [s.strip() for s in raw.split(",") if s.strip()]
-        if len(parts) >= count:
-            return [float(p) for p in parts[:count]]
-        # Pad with the default if not enough values were provided
-        return [float(p) for p in parts] + [SENSITIVITY] * (count - len(parts))
-    return [SENSITIVITY] * count
+def _load_oww_model(onnx_paths: list[Path]) -> Model:
+    """Load an OpenWakeWord model from .onnx files, or fall back to hey_jarvis."""
+    if onnx_paths:
+        logger.info(
+            "Wake word models loaded: %s",
+            ", ".join(p.stem for p in onnx_paths),
+        )
+        return Model(
+            wakeword_models=[str(p) for p in onnx_paths],
+            inference_framework="onnx",
+        )
+    # Fallback: use a built-in model during development / before custom model exists
+    logger.warning(
+        "No .onnx models found in %s — falling back to built-in 'hey_jarvis' for testing. "
+        "See documentation/adding-openwakeword-model.md to add a custom wake word.",
+        _MODELS_DIR,
+    )
+    return Model(wakeword_models=["hey_jarvis"], inference_framework="onnx")
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -97,15 +126,15 @@ def wait_for_wake_word(
     """
     Block until any configured wake word is detected, then return.
 
-    Auto-discovers every .ppn file in voice/models/ and loads them all
+    Auto-discovers every .onnx file in voice/models/ and loads them all
     simultaneously — so "Hey Charles", "Charles", or any other variant you
-    generate will all trigger the same callback.
+    add will all trigger the same callback.
 
     Parameters
     ----------
     on_detected
         Optional callback invoked immediately on detection (before returning).
-        Receives the label of the matched keyword (e.g. ``'charles'``).
+        Receives the model name of the matched keyword (e.g. ``'hey_charles'``).
         Useful for lighting up a status indicator from the launcher.
     input_device_index
         Microphone device index.  None → system default.
@@ -115,78 +144,58 @@ def wait_for_wake_word(
     Returns
     -------
     str
-        The label of the keyword that triggered (e.g. ``'hey-charles'`` or
-        ``'charles'``).  Returns ``'unknown'`` on fallback keywords.
+        The model name that triggered (e.g. ``'hey_charles'``).
+        Returns ``'stopped'`` if stop_event was set before detection.
     """
-    if not ACCESS_KEY:
-        raise EnvironmentError(
-            "PICOVOICE_ACCESS_KEY is not set. "
-            "Sign up at https://console.picovoice.ai/ and add the key to your .env file."
-        )
-
-    ppn_paths = _discover_models()
-
-    if ppn_paths:
-        keyword_labels = [_keyword_label(p) for p in ppn_paths]
-        sensitivities = _build_sensitivities(len(ppn_paths))
-        logger.info(
-            "Wake word models loaded: %s (sensitivities: %s)",
-            ", ".join(keyword_labels),
-            ", ".join(f"{s:.2f}" for s in sensitivities),
-        )
-        porcupine = pvporcupine.create(
-            access_key=ACCESS_KEY,
-            keyword_paths=[str(p) for p in ppn_paths],
-            sensitivities=sensitivities,
-        )
+    _ensure_oww_models()
+    onnx_paths = _discover_models()
+    if onnx_paths:
+        logger.info("Found wake word models in %s: %s", _MODELS_DIR, [p.name for p in onnx_paths])
     else:
-        # Fallback: use two built-in keywords as stand-ins during development
-        logger.warning(
-            "No .ppn files found in %s. "
-            "Falling back to built-in 'porcupine' keyword for testing. "
-            "Generate 'Hey Charles' and 'Charles' models at https://console.picovoice.ai/ppn "
-            "and place them in voice/models/",
-            _MODELS_DIR,
-        )
-        keyword_labels = ["porcupine (fallback)"]
-        porcupine = pvporcupine.create(
-            access_key=ACCESS_KEY,
-            keywords=["porcupine"],
-            sensitivities=[SENSITIVITY],
-        )
+        logger.info("No .onnx models found in %s", _MODELS_DIR)
+    oww = _load_oww_model(onnx_paths)
+    buffer: list[int] = []
 
     logger.info(
-        "Listening for: %s  (frame_length=%d, sample_rate=%d)",
-        " | ".join(keyword_labels),
-        porcupine.frame_length,
-        porcupine.sample_rate,
+        "Listening for: %s  (threshold=%.2f, frame=%d samples)",
+        " | ".join(oww.models.keys()),
+        THRESHOLD,
+        _OWW_FRAME_SAMPLES,
     )
 
-    try:
-        with MicrophoneStream(input_device_index=input_device_index) as mic:
-            while True:
-                if stop_event is not None and stop_event.is_set():
-                    logger.info("stop_event set — exiting wake word loop")
-                    return "stopped"
+    with MicrophoneStream(input_device_index=input_device_index) as mic:
+        while True:
+            if stop_event is not None and stop_event.is_set():
+                logger.info("stop_event set — exiting wake word loop")
+                return "stopped"
 
-                pcm_bytes = mic.read_frame()
+            pcm_bytes = mic.read_frame()
 
-                # Porcupine expects a list of 16-bit signed ints, one per sample
-                pcm = list(
-                    int.from_bytes(pcm_bytes[i : i + 2], byteorder="little", signed=True)
-                    for i in range(0, len(pcm_bytes), 2)
-                )
+            # Convert raw bytes to a list of signed 16-bit ints
+            samples = [
+                int.from_bytes(pcm_bytes[i : i + 2], byteorder="little", signed=True)
+                for i in range(0, len(pcm_bytes), 2)
+            ]
+            buffer.extend(samples)
 
-                result = porcupine.process(pcm)
-                if result >= 0:
-                    label = keyword_labels[result] if result < len(keyword_labels) else "unknown"
-                    logger.info("Wake word detected: '%s'", label)
-                    if on_detected:
-                        on_detected(label)
-                    return label
+            # Process complete 1280-sample frames; keep the remainder buffered
+            while len(buffer) >= _OWW_FRAME_SAMPLES:
+                frame = np.array(buffer[:_OWW_FRAME_SAMPLES], dtype=np.int16)
+                buffer = buffer[_OWW_FRAME_SAMPLES:]
+                scores: dict[str, float] = oww.predict(frame)
 
-    finally:
-        porcupine.delete()
+                # Emit debug telemetry so the launcher can display mic level
+                # and per-model scores in real time.
+                rms = float(np.sqrt(np.mean(frame.astype(np.float32) ** 2)) / 32767)
+                parts = [f"rms={rms:.4f}"] + [f"{n}={s:.4f}" for n, s in scores.items()]
+                print(f"VOICE_DEBUG:{','.join(parts)}", flush=True)
+
+                for name, score in scores.items():
+                    if score >= THRESHOLD:
+                        logger.info("Wake word detected: '%s' (score=%.3f)", name, score)
+                        if on_detected:
+                            on_detected(name)
+                        return name
 
 
 def run_forever(
@@ -212,10 +221,11 @@ def run_forever(
     """
     models = _discover_models()
     if models:
-        labels = " | ".join(_keyword_label(p) for p in models)
+        labels = " | ".join(p.stem for p in models)
         logger.info("Wake word loop started — listening for: %s", labels)
     else:
-        logger.info("Wake word loop started — listening for: porcupine (fallback)")
+        logger.info("Wake word loop started — listening for: hey_jarvis (fallback)")
+
     while True:
         if stop_event is not None and stop_event.is_set():
             break

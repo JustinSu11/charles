@@ -1,15 +1,16 @@
 # Voice Service — Python Dependencies
 # Install with: pip install -r requirements.txt
 #
-# Requires Python 3.10–3.12  (Python 3.13+ not yet supported — torch / PyAudio
-#                              / pvporcupine wheels require PyO3 ≤ 0.20 which caps at 3.12)
+# Requires Python 3.10–3.12  (Python 3.13+ not yet fully supported — torch / PyAudio
+#                              wheels may not be available for 3.13 on all platforms)
 # Tested on Windows (WASAPI), macOS (CoreAudio), Linux (ALSA/PulseAudio)
 
 # ── Wake word detection ──────────────────────────────────────────────────────
-# Picovoice Porcupine — always-on, low-CPU wake word engine
-# Requires a free Picovoice account and a .ppn model file for "Hey Charles"
-# Sign up at: https://console.picovoice.ai/
-pvporcupine==4.0.0
+# OpenWakeWord — fully open-source, Apache-2.0 wake word engine
+# No API key or account required. Uses ONNX models (.onnx files in voice/models/).
+# Falls back to built-in 'hey_jarvis' model if no custom models are present.
+# See: https://github.com/dscripka/openWakeWord
+openwakeword>=0.6.0
 
 # ── Speech-to-text ───────────────────────────────────────────────────────────
 # OpenAI Whisper — local, offline transcription (no data leaves the machine)

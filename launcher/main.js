@@ -101,10 +101,29 @@ function pollHealth(maxAttempts = 15) {
   })
 }
 
+// ── Port cleanup ──────────────────────────────────────────────────────────────
+// Kill any process already bound to a given port (Windows only).
+// Prevents EADDRINUSE when Charles is restarted without a full quit.
+function killPortSync(port) {
+  try {
+    const { execSync } = require('child_process')
+    // netstat output: "  TCP  127.0.0.1:8000  ...  <pid>"
+    const out = execSync(`netstat -ano -p tcp`, { timeout: 3000 }).toString()
+    const re  = new RegExp(`[\\s:]${port}\\s+\\S+\\s+LISTENING\\s+(\\d+)`, 'i')
+    const match = out.match(re)
+    if (match) {
+      const pid = parseInt(match[1], 10)
+      try { execSync(`taskkill /PID ${pid} /F`, { timeout: 3000 }) } catch {}
+    }
+  } catch {}
+}
+
 // ── API lifecycle (automatic) ─────────────────────────────────────────────────
 async function startApi() {
   // Kill any leftover API process (e.g. from a previous instance that hid to tray)
   if (apiProcess) { try { apiProcess.kill() } catch {} ; apiProcess = null }
+  // Kill any orphan process from a prior crash that's still holding the port
+  killPortSync(8000)
 
   mainWindow?.webContents.send('status-update', { state: 'initializing' })
 
@@ -157,10 +176,17 @@ async function startVoice() {
         } else if (t.startsWith('VOICE_TRANSCRIPT:')) {
           const text = t.slice('VOICE_TRANSCRIPT:'.length)
           mainWindow?.webContents.send('voice-transcript', { text })
+        } else if (t.startsWith('VOICE_DEBUG:')) {
+          const payload = {}
+          for (const pair of t.slice('VOICE_DEBUG:'.length).split(',')) {
+            const [k, v] = pair.split('=')
+            if (k && v !== undefined) payload[k] = parseFloat(v)
+          }
+          mainWindow?.webContents.send('voice-debug', payload)
         }
       }
     })
-    vproc.on('error', (err) => {
+    vproc.on('error', () => {
       if (voiceProcess === vproc) {
         mainWindow?.webContents.send('voice-state-update', { state: 'error' })
         voiceProcess = null
