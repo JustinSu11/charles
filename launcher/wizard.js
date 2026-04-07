@@ -4,7 +4,7 @@
  * Walks the user through:
  *   1. Python version check
  *   2. pip dependency install (api + voice requirements)
- *   3. Connect OpenRouter via OAuth + enter Picovoice key
+ *   3. Enter API keys (OpenRouter required, VirusTotal optional)
  *   4. Writing .env and marking setup complete
  *
  * All IPC handlers are removed after finish() so they cannot
@@ -98,13 +98,8 @@ function _registerHandlers(onComplete) {
     }
   })
 
-  // ── Step 3b: validate Picovoice key ───────────────────────────────────────
-  ipcMain.handle('wizard:validate-picovoice', async (_, { picovoiceKey }) => {
-    return validatePicovoiceKey(picovoiceKey)
-  })
-
-  // ── Step 3c: save keys to .env ────────────────────────────────────────────
-  ipcMain.handle('wizard:save-keys', (_, { openrouterKey, picovoiceKey, virustotalKey }) => {
+  // ── Step 3b: save keys to .env ───────────────────────────────────────────
+  ipcMain.handle('wizard:save-keys', (_, { openrouterKey, virustotalKey }) => {
     const envPath = path.join(projectRoot, '.env')
     let content = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
 
@@ -115,7 +110,6 @@ function _registerHandlers(onComplete) {
     }
 
     content = upsert(content, 'OPENROUTER_API_KEY', openrouterKey)
-    content = upsert(content, 'PICOVOICE_ACCESS_KEY', picovoiceKey)
     // Only write VirusTotal key if the user provided one
     if (virustotalKey) {
       content = upsert(content, 'VIRUSTOTAL_API_KEY', virustotalKey)
@@ -139,7 +133,6 @@ function _registerHandlers(onComplete) {
   // Utility: open a URL in the system browser from renderer code
   ipcMain.handle('wizard:open-external', (_, url) => {
     const allowed = [
-      'https://console.picovoice.ai/',
       'https://openrouter.ai/keys',
       'https://www.virustotal.com/gui/sign-in',
     ]
@@ -149,90 +142,10 @@ function _registerHandlers(onComplete) {
 
 function _removeHandlers() {
   for (const ch of ['wizard:check-python', 'wizard:install-deps',
-    'wizard:validate-picovoice',
     'wizard:save-keys', 'wizard:finish', 'wizard:close',
     'wizard:open-external']) {
     ipcMain.removeHandler(ch)
   }
-}
-
-// ── Picovoice key validation ──────────────────────────────────────────────────
-//
-// Called when the user enters their Picovoice access key.
-// The key is needed at runtime for the pvporcupine SDK licence check
-// (even though the .ppn wake word model files are already in the repo).
-//
-// Parameters
-// ----------
-// picovoiceKey  — string entered by the user
-//
-// Returns
-// -------
-// { ok: true }
-//   or
-// { ok: false, error: 'human-readable message shown in the wizard UI' }
-//
-// TODO: implement this function.
-//
-// Things to consider:
-//   Option A — format check only (fast, ~0ms):
-//     Picovoice keys are long base64 strings, typically 128–512 chars.
-//     Reject if empty or clearly too short, accept otherwise.
-//     Downside: a valid-looking but revoked key won't be caught until
-//     the user tries to use voice features.
-//
-//   Option B — live SDK check (slow, ~3s):
-//     Spawn: python -c "import pvporcupine; pvporcupine.create(access_key='<key>').delete()"
-//     Exit code 0 = key is valid and the SDK accepted it.
-//     Downside: requires pvporcupine to already be installed (it will be,
-//     since this runs after Step 2), and adds a few seconds of wait time.
-//
-async function validatePicovoiceKey(picovoiceKey) {
-  if (!picovoiceKey || !picovoiceKey.trim()) {
-    return { ok: false, error: 'Picovoice key cannot be empty.' }
-  }
-
-  return new Promise((resolve) => {
-    // Key is passed via environment variable — never injected into the script
-    // string — so quotes or special characters in the key can't break anything.
-    const script = [
-      'import pvporcupine, os',
-      'pv = pvporcupine.create(access_key=os.environ["PV_KEY"], keywords=["porcupine"])',
-      'pv.delete()',
-    ].join('; ')
-
-    const proc = spawn('python', ['-c', script], {
-      stdio: ['ignore', 'ignore', 'pipe'],
-      env: { ...process.env, PV_KEY: picovoiceKey },
-    })
-
-    let stderr = ''
-    proc.stderr.on('data', d => { stderr += d })
-
-    // 10-second timeout — SDK init should be near-instant
-    const timer = setTimeout(() => {
-      proc.kill()
-      resolve({ ok: false, error: 'Validation timed out. Check your internet connection.' })
-    }, 10_000)
-
-    proc.on('exit', (code) => {
-      clearTimeout(timer)
-      if (code === 0) {
-        resolve({ ok: true })
-      } else {
-        // pvporcupine prints a descriptive error to stderr — surface it
-        const hint = stderr.includes('invalid') || stderr.includes('Invalid')
-          ? 'Key not recognised — double-check at console.picovoice.ai'
-          : 'Picovoice validation failed — check your key and internet connection.'
-        resolve({ ok: false, error: hint })
-      }
-    })
-
-    proc.on('error', () => {
-      clearTimeout(timer)
-      resolve({ ok: false, error: 'Could not run Python to validate key.' })
-    })
-  })
 }
 
 // ── Exports ───────────────────────────────────────────────────────────────────
