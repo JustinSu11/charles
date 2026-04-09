@@ -386,6 +386,7 @@ let conversationId      = null;   // set after first turn or history load
 let pendingTurn         = null;   // DOM node for the "thinking…" indicator
 let thinkingInterval    = null;   // setInterval ID for the animated dots
 let pendingVoiceWrapper = null;   // .turn wrapper rendered immediately on voice transcript
+let pendingTextWrapper  = null;   // .turn wrapper rendered immediately on text send
 let socket              = null;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
@@ -533,6 +534,15 @@ function connectWebSocket(attempt = 0) {
       pendingVoiceWrapper.appendChild(assistBubble);
       pendingVoiceWrapper = null;
       scrollToBottom();
+    } else if (pendingTextWrapper && msg.interface === "web") {
+      // User bubble was already rendered in sendMessage — only append the assistant response.
+      // md() sanitizes via DOMPurify before setting innerHTML (same as renderTurn).
+      const assistBubble = document.createElement("div");
+      assistBubble.className = "bubble assistant";
+      assistBubble.innerHTML = md(msg.assistant.content); // md() = DOMPurify.sanitize(marked.parse(...))
+      pendingTextWrapper.appendChild(assistBubble);
+      pendingTextWrapper = null;
+      scrollToBottom();
     } else {
       renderTurn(msg);
     }
@@ -564,6 +574,18 @@ async function sendMessage() {
   $input.value = "";
   $input.style.height = "auto";
   $sendBtn.disabled = true;
+
+  // Immediately render the user bubble so the message is visible before the AI responds.
+  const wrapper = document.createElement("div");
+  wrapper.className = "turn";
+  const userBubble = document.createElement("div");
+  userBubble.className = "bubble user";
+  userBubble.textContent = text;
+  wrapper.appendChild(userBubble);
+  $messages.appendChild(wrapper);
+  scrollToBottom();
+  pendingTextWrapper = wrapper;
+
   showThinking();
 
   try {
