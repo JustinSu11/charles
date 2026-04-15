@@ -230,12 +230,12 @@ classDiagram
         Returns: MP3 audio stream
     }
 
-    class OWWModels {
-        <<external>>
-        +melspectrogram.onnx
-        +embedding_model.onnx
-        Downloaded once on first run
-    }
+%    class OWWModels {
+%        <<external>>
+%        +melspectrogram.onnx
+%        +embedding_model.onnx
+%        Downloaded once on first run
+%    }
 
     %% ── Relationships ────────────────────────────────────────────────────────
 
@@ -245,7 +245,7 @@ classDiagram
     VoiceMain --> VoiceAPIClient : calls send_message
     VoiceMain --> AudioModule : calls record_until_silence
     WakeWordModule --> MicrophoneStream : opens stream
-    WakeWordModule --> OWWModels : downloads on first run
+    % WakeWordModule --> OWWModels : downloads on first run
     AudioModule --> MicrophoneStream : opens stream
 
     ChatRouter --> ConversationService : resolve + store messages
