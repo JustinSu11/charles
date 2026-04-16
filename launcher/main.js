@@ -24,6 +24,12 @@ const voiceScript = isPacked
   ? path.join(process.resourcesPath, 'voice', 'main.py')
   : path.join(__dirname, '..', 'voice', 'main.py')
 
+// Use bundled Python 3.11 in the packaged app (no system Python required).
+// Falls back to bare 'python' in dev so devs can use their own environment.
+const pythonExe = isPacked
+  ? path.join(process.resourcesPath, 'python', 'python.exe')
+  : 'python'
+
 let mainWindow   = null
 let tray         = null
 let apiProcess   = null
@@ -127,8 +133,8 @@ async function startApi() {
 
   mainWindow?.webContents.send('status-update', { state: 'initializing' })
 
-  const proc = spawn('python', [apiScript], {
-    env: { ...process.env },
+  const proc = spawn(pythonExe, [apiScript], {
+    env: { ...process.env, CHARLES_DATA_DIR: app.getPath('userData') },
     stdio: ['ignore', 'ignore', 'pipe'],
   })
   apiProcess = proc
@@ -162,8 +168,8 @@ async function startVoice() {
   try {
     if (voiceProcess) { voiceProcess.kill(); voiceProcess = null }
 
-    const vproc = spawn('python', [voiceScript, '--no-preload'], {
-      env: { ...process.env },
+    const vproc = spawn(pythonExe, [voiceScript, '--no-preload'], {
+      env: { ...process.env, CHARLES_DATA_DIR: app.getPath('userData') },
       stdio: ['pipe', 'pipe', 'pipe'],  // stdin piped so we can send INTERRUPT
     })
     voiceProcess = vproc
@@ -238,7 +244,8 @@ function registerIPC() {
   ipcMain.handle('close-window',    () => mainWindow?.close())
   ipcMain.handle('quit-app',        () => { app.isQuiting = true; stopAll(); app.quit() })
 
-  const envPath = path.join(__dirname, '..', '.env')
+  // In the packaged app, resources/ is read-only — store .env in userData instead.
+  const envPath = path.join(app.getPath('userData'), '.env')
 
   ipcMain.handle('settings:get-keys', () => {
     const content = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''

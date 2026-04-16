@@ -12,7 +12,13 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy import text
 from dotenv import load_dotenv
 
-load_dotenv()
+# When running packaged, Electron passes CHARLES_DATA_DIR pointing to userData.
+# Load .env from there first (override=False so real env vars always win),
+# then fall back to CWD/.env for dev mode.
+_env_data_dir = os.environ.get("CHARLES_DATA_DIR")
+if _env_data_dir:
+    load_dotenv(pathlib.Path(_env_data_dir) / ".env", override=False)
+load_dotenv()  # dev fallback (CWD / project root)
 
 # Resolve DB file path
 _data_dir = pathlib.Path(

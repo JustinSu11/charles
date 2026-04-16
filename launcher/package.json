@@ -17,8 +17,9 @@
     "productName": "Charles",
     "win": { "target": "nsis" },
     "extraResources": [
-      { "from": "../api",   "to": "api"   },
-      { "from": "../voice", "to": "voice" }
+      { "from": "../api",              "to": "api"    },
+      { "from": "../voice",            "to": "voice"  },
+      { "from": "../resources/python", "to": "python" }
     ]
   }
 }

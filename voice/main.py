@@ -36,7 +36,13 @@ from typing import Optional
 from dotenv import load_dotenv
 
 # ── Load .env before importing our modules (they read env at import time) ──────
-load_dotenv()
+# When running packaged, Electron passes CHARLES_DATA_DIR pointing to userData.
+# Load .env from there first (override=False so real env vars always win),
+# then fall back to CWD/.env for dev mode.
+_env_data_dir = os.environ.get("CHARLES_DATA_DIR")
+if _env_data_dir:
+    load_dotenv(os.path.join(_env_data_dir, ".env"), override=False)
+load_dotenv()  # dev fallback (CWD / project root)
 
 # ── Ensure stdout is UTF-8 on Windows (default cp1252 can't encode Whisper output) ──
 if hasattr(sys.stdout, 'reconfigure'):
