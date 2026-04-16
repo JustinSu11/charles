@@ -237,6 +237,34 @@ function registerIPC() {
   ipcMain.handle('minimize-window', () => mainWindow?.minimize())
   ipcMain.handle('close-window',    () => mainWindow?.close())
   ipcMain.handle('quit-app',        () => { app.isQuiting = true; stopAll(); app.quit() })
+
+  const envPath = path.join(__dirname, '..', '.env')
+
+  ipcMain.handle('settings:get-keys', () => {
+    const content = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
+    const getVal = (key) => {
+      const match = content.match(new RegExp(`^${key}=(.*)$`, 'm'))
+      return match ? match[1].trim() : ''
+    }
+    return {
+      openrouterKey: getVal('OPENROUTER_API_KEY'),
+      virustotalKey: getVal('VIRUSTOTAL_API_KEY'),
+    }
+  })
+
+  ipcMain.handle('settings:save-keys', async (_, { openrouterKey, virustotalKey }) => {
+    let content = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
+    const upsert = (src, key, value) => {
+      const re = new RegExp(`^${key}=.*$`, 'm')
+      const line = `${key}=${value}`
+      return re.test(src) ? src.replace(re, line) : `${src}\n${line}`
+    }
+    if (openrouterKey) content = upsert(content, 'OPENROUTER_API_KEY', openrouterKey)
+    if (virustotalKey !== undefined) content = upsert(content, 'VIRUSTOTAL_API_KEY', virustotalKey)
+    fs.writeFileSync(envPath, content.trim() + '\n', 'utf8')
+    await startApi()
+    return { ok: true }
+  })
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
