@@ -27,6 +27,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('voice-debug', listener)
     return () => ipcRenderer.removeListener('voice-debug', listener)
   },
-  getApiKeys:  () => ipcRenderer.invoke('settings:get-keys'),
-  saveApiKeys: (keys) => ipcRenderer.invoke('settings:save-keys', keys),
+  getApiKeys:   () => ipcRenderer.invoke('settings:get-keys'),
+  saveApiKeys:  (keys) => ipcRenderer.invoke('settings:save-keys', keys),
+  installUpdate: () => ipcRenderer.invoke('install-update'),
+  onUpdateStatus: (cb) => {
+    const listener = (_e, d) => cb(d)
+    ipcRenderer.on('update-status', listener)
+    return () => ipcRenderer.removeListener('update-status', listener)
+  },
 })

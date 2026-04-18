@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "dist": "npm run dist --prefix launcher"
+  }
+}

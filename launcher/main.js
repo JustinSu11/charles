@@ -10,11 +10,31 @@
  */
 
 const { app, BrowserWindow, ipcMain, nativeImage, Tray, Menu } = require('electron')
+const { autoUpdater } = require('electron-updater')
 const path   = require('path')
 const fs     = require('fs')
 const http   = require('http')
 const { spawn } = require('child_process')
 const { createWizardWindow, setupFlagPath } = require('./wizard')
+
+// ── Auto-updater ──────────────────────────────────────────────────────────────
+// Check GitHub Releases silently on launch. If a new version is available,
+// it downloads in the background and we notify the renderer to show a banner.
+function setupAutoUpdater() {
+  autoUpdater.autoDownload    = true   // download silently in background
+  autoUpdater.autoInstallOnAppQuit = false // we control when to install
+
+  autoUpdater.on('update-available', () => {
+    mainWindow?.webContents.send('update-status', { state: 'downloading' })
+  })
+
+  autoUpdater.on('update-downloaded', () => {
+    mainWindow?.webContents.send('update-status', { state: 'ready' })
+  })
+
+  // Only check for updates in the packaged app — not during development
+  if (isPacked) autoUpdater.checkForUpdates()
+}
 
 const isPacked    = app.isPackaged
 const apiScript   = isPacked
@@ -240,9 +260,10 @@ function registerIPC() {
     }
     return { ok: true }
   })
-  ipcMain.handle('minimize-window', () => mainWindow?.minimize())
-  ipcMain.handle('close-window',    () => mainWindow?.close())
-  ipcMain.handle('quit-app',        () => { app.isQuiting = true; stopAll(); app.quit() })
+  ipcMain.handle('minimize-window',  () => mainWindow?.minimize())
+  ipcMain.handle('close-window',     () => mainWindow?.close())
+  ipcMain.handle('quit-app',         () => { app.isQuiting = true; stopAll(); app.quit() })
+  ipcMain.handle('install-update',   () => { stopAll(); autoUpdater.quitAndInstall() })
 
   // In the packaged app, resources/ is read-only — store .env in userData instead.
   const envPath = path.join(app.getPath('userData'), '.env')
@@ -280,9 +301,12 @@ function launchMain() {
   createWindow()
   createTray()
   registerIPC()
-  // Defer startApi until the renderer has finished loading so IPC status
-  // events aren't dropped before the listener is registered.
-  mainWindow.webContents.once('did-finish-load', () => startApi())
+  // Defer startApi and update check until the renderer has finished loading
+  // so IPC events aren't dropped before listeners are registered.
+  mainWindow.webContents.once('did-finish-load', () => {
+    startApi()
+    setupAutoUpdater()
+  })
 }
 
 // Prevent multiple instances — if a second instance is launched, focus
