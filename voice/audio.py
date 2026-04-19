@@ -297,6 +297,55 @@ def _pcm_to_wav_bytes(samples: np.ndarray, sample_rate: int = 24_000) -> bytes:
     return buf.getvalue()
 
 
+def play_wake_chime(output_device_index: Optional[int] = None) -> None:
+    """
+    Play a soft 2-tone rising chime immediately when the wake word fires.
+
+    Gives the user instant audio confirmation that Charles heard them —
+    before the TTS ack phrase ("Yes?") has time to generate.
+    Two tones: E5 (660 Hz) → A5 (880 Hz), upward motion, warm not sharp.
+    """
+    SR = 24_000
+    try:
+        lo = _make_tone(660, 110, SR, amplitude=0.25)
+        silence = np.zeros(int(SR * 0.020), dtype=np.float32)
+        hi = _make_tone(880, 160, SR, amplitude=0.25)
+        chime = np.concatenate([lo, silence, hi])
+        play_wav_bytes(_pcm_to_wav_bytes(chime, SR), output_device_index=output_device_index)
+    except Exception as exc:
+        logger.debug("Wake chime failed: %s", exc)
+
+
+def play_processing_loop(
+    stop_event: threading.Event,
+    output_device_index: Optional[int] = None,
+) -> None:
+    """
+    Play a very soft repeating pulse while Charles is waiting for the API response.
+
+    Runs in a background thread — caller sets stop_event to end playback.
+    Each cycle: 80 ms tone + 120 ms silence = 200 ms period.
+    Kept very quiet (amplitude 0.10) so it doesn't compete with speech.
+    """
+    SR = 24_000
+    pulse = _pcm_to_wav_bytes(_make_tone(440, 80, SR, amplitude=0.10), SR)
+    silence_ms = 120
+    silence_samples = int(SR * silence_ms / 1000)
+
+    while not stop_event.is_set():
+        try:
+            play_wav_bytes(pulse, output_device_index=output_device_index)
+        except Exception as exc:
+            logger.debug("Processing loop pulse failed: %s", exc)
+            break
+        # Sleep for the silence gap in small increments so stop_event is checked promptly
+        deadline = time.monotonic() + silence_ms / 1000
+        while time.monotonic() < deadline:
+            if stop_event.is_set():
+                return
+            time.sleep(0.02)
+
+
 def play_thinking_chime(output_device_index: Optional[int] = None) -> None:
     """
     Play a soft, warm pad tone to signal that Charles is processing.

@@ -188,7 +188,7 @@ async function startVoice() {
   try {
     if (voiceProcess) { voiceProcess.kill(); voiceProcess = null }
 
-    const vproc = spawn(pythonExe, [voiceScript, '--no-preload'], {
+    const vproc = spawn(pythonExe, [voiceScript], {
       env: { ...process.env, CHARLES_DATA_DIR: app.getPath('userData') },
       stdio: ['pipe', 'pipe', 'pipe'],  // stdin piped so we can send INTERRUPT
     })

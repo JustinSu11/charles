@@ -168,18 +168,19 @@ def _one_turn(
     # Emit transcript immediately so the GUI can show it before the API responds
     print(f"VOICE_TRANSCRIPT:{text}", flush=True)
 
-    # Play a short thinking chime in the background so the user hears
-    # immediate confirmation that their speech was captured.  The chime
-    # (~470 ms) runs concurrently with the API call — zero added latency.
+    # Start a soft repeating hum so the user knows Charles is working.
+    # Runs until the API responds — then we stop it before TTS starts.
+    _hum_stop = threading.Event()
     threading.Thread(
-        target=audio.play_thinking_chime,
-        kwargs={"output_device_index": output_device_index},
+        target=audio.play_processing_loop,
+        kwargs={"stop_event": _hum_stop, "output_device_index": output_device_index},
         daemon=True,
-        name="thinking-chime",
+        name="processing-hum",
     ).start()
 
     # Send to Charles API
     reply = api_client.send_message(text)
+    _hum_stop.set()  # stop hum before TTS begins
 
     # Speak reply — barge-in enabled so the user can interrupt naturally.
     # barge_in=True activates the background monitor that watches the mic
@@ -208,6 +209,9 @@ def handle_wake(
       • the user is silent for CONVERSATION_TIMEOUT_S seconds
       • stop_event is set (voice service shutting down)
     """
+    # Instant audio confirmation — chime fires before edge-tts can generate speech
+    audio.play_wake_chime(output_device_index=output_device_index)
+
     # Acknowledge
     ack = _ack_phrase()
     logger.info("Wake word detected — acknowledging: %r", ack)
@@ -332,6 +336,7 @@ def main() -> None:
     logger.info("=== Charles Voice Service starting ===")
 
     if not args.no_preload:
+        print("VOICE_STATE:LOADING", flush=True)
         startup_checks()
 
     # Graceful shutdown on Ctrl+C / SIGTERM
