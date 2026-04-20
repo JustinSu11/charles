@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
     One-time developer setup: downloads Python 3.11 Windows embeddable package,
-    bootstraps pip, and places it in resources/python/ for electron-builder to bundle.
+    bootstraps pip, installs all API and voice dependencies, and places the result
+    in resources/python/ for electron-builder to bundle.
 
 .DESCRIPTION
     Run this script once before building the Windows installer with `npm run dist`.
@@ -9,7 +10,9 @@
     bundled into the installer via the extraResources field in launcher/package.json.
 
     After this runs, the packaged Charles installer works on a fresh Windows OS
-    without requiring the user to pre-install Python.
+    without requiring the user to pre-install Python or any dependencies.
+
+    Expected output size: ~1.5 GB (dominated by torch CPU wheels for Whisper STT).
 
 .EXAMPLE
     pwsh -ExecutionPolicy Bypass -File scripts/setup-embedded-python.ps1
@@ -67,13 +70,60 @@ Invoke-WebRequest $getPipUrl -OutFile $getPipFile -UseBasicParsing
 Remove-Item $getPipFile
 Write-Host "pip installed." -ForegroundColor Green
 
-# ── 5. Verify ─────────────────────────────────────────────────────────────────
+# ── 5. Install API dependencies ───────────────────────────────────────────────
+$apiReqs = Join-Path $PSScriptRoot "..\api\requirements.txt"
+$apiReqs = [System.IO.Path]::GetFullPath($apiReqs)
+Write-Host "Installing API dependencies from $apiReqs ..." -ForegroundColor Yellow
+& $pythonExe -m pip install `
+    --requirement $apiReqs `
+    --quiet `
+    --no-warn-script-location
+Write-Host "API dependencies installed." -ForegroundColor Green
+
+# ── 6. Install voice dependencies ────────────────────────────────────────────
+$voiceReqs = Join-Path $PSScriptRoot "..\voice\requirements.txt"
+$voiceReqs = [System.IO.Path]::GetFullPath($voiceReqs)
+Write-Host "Installing voice dependencies from $voiceReqs ..." -ForegroundColor Yellow
+Write-Host "(This will take several minutes — torch CPU wheels are ~700 MB)" -ForegroundColor DarkYellow
+
+# Install torch CPU-only first to avoid pulling in large CUDA builds.
+# The +cpu variant is a PyTorch index extra that selects the CPU-only wheel.
+& $pythonExe -m pip install `
+    torch torchaudio `
+    --index-url https://download.pytorch.org/whl/cpu `
+    --quiet `
+    --no-warn-script-location
+
+# Install the rest of the voice requirements.
+# torch/torchaudio are already satisfied by the CPU build above — pip will
+# skip them because the installed version meets the >= constraint.
+& $pythonExe -m pip install `
+    --requirement $voiceReqs `
+    --quiet `
+    --no-warn-script-location
+
+Write-Host "Voice dependencies installed." -ForegroundColor Green
+
+# ── 7. Verify ─────────────────────────────────────────────────────────────────
 Write-Host ""
 Write-Host "Verifying..." -ForegroundColor Yellow
 $pyVer = & $pythonExe --version
 $pipVer = & $pythonExe -m pip --version
 Write-Host "  Python : $pyVer" -ForegroundColor Green
 Write-Host "  pip    : $pipVer" -ForegroundColor Green
+
+# Smoke-test key imports
+Write-Host "  Smoke-testing imports..." -ForegroundColor Yellow
+$imports = @("fastapi", "uvicorn", "sqlalchemy", "openwakeword", "whisper", "pyaudio", "edge_tts", "miniaudio")
+foreach ($mod in $imports) {
+    $result = & $pythonExe -c "import $mod; print('ok')" 2>&1
+    if ($result -eq "ok") {
+        Write-Host "    $mod : ok" -ForegroundColor Green
+    } else {
+        Write-Warning "    $mod : FAILED — $result"
+    }
+}
+
 Write-Host ""
 Write-Host "Embedded Python ready at:" -ForegroundColor Cyan
 Write-Host "  $dest"
