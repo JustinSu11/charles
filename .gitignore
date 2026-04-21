@@ -183,3 +183,8 @@ resources/python/
 .superpowers/
 .claude/
 voice/preview_*.wav
+
+# ── Local dev / preview artifacts ────────────────────────────────────────────
+.playwright-mcp/
+assets/
+charles-landing-preview.html
