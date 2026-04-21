@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Charles — Hands-Free AI Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@phosphor-icons/web@2.1.1/src/bold/style.css">
+<style>
+/* ─────────────── Variables ─────────────── */
+:root {
+  --bg:          #f8f7f2;
+  --surface:     #ffffff;
+  --surface2:    #f1f0ea;
+  --border:      #e0dfd7;
+  --border2:     #c8c6bc;
+  --accent:      #1d4ed8;
+  --accent-glow: rgba(29,78,216,0.14);
+  --accent-dim:  rgba(29,78,216,0.07);
+  --text:        #1a1916;
+  --text-muted:  #706e66;
+  --text-dim:    #ccc9be;
+  --font-d:      'Bebas Neue', sans-serif;
+  --font-b:      'Space Mono', monospace;
+}
+
+/* ─────────────── Reset ─────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-b);
+  background: var(--bg);
+  color: var(--text);
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* page transitions */
+.page { display: none; }
+.page.active { display: block; animation: rise 0.3s cubic-bezier(0.16,1,0.3,1); }
+@keyframes rise {
+  from { opacity:0; transform:translateY(10px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* ─────────────── Nav ─────────────── */
+nav {
+  position: fixed; top:0; left:0; right:0; z-index:500;
+  background: rgba(248,247,242,0.92);
+  backdrop-filter: blur(20px) saturate(150%);
+  border-bottom: 1px solid var(--border);
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 48px;
+}
+.nav-logo {
+  font-family: var(--font-d);
+  font-size: 22px; letter-spacing: 0.06em;
+  color: var(--text); cursor: pointer; transition: color 0.15s;
+  border: none; background: none;
+}
+.nav-logo span { color: var(--accent); }
+.nav-logo:hover { color: var(--accent); }
+
+.nav-right { display:flex; gap:0; align-items:center; }
+.nav-link {
+  font-size: 10px; font-weight:700;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--text-muted); padding: 8px 16px;
+  cursor: pointer; background:none; border:none;
+  transition: color 0.15s; font-family: var(--font-b);
+}
+.nav-link:hover { color: var(--text); }
+.nav-cta {
+  font-family: var(--font-b);
+  font-size: 10px; font-weight:700;
+  text-transform: uppercase; letter-spacing: 0.12em;
+  color: #fff; background: var(--accent);
+  border: none; padding: 9px 22px;
+  cursor: pointer; transition: all 0.15s; margin-left: 8px;
+}
+.nav-cta:hover { opacity: 0.85; transform: translateY(-1px); }
+
+/* ─────────────── Shared Buttons ─────────────── */
+.btn-primary {
+  font-family: var(--font-b); font-size: 11px; font-weight:700;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: #fff; background: var(--accent);
+  border: none; padding: 14px 32px;
+  cursor: pointer; transition: all 0.2s;
+  display: flex; align-items:center; gap:8px;
+}
+.btn-primary:hover {
+  opacity:0.88; transform:translateY(-2px);
+  box-shadow: 0 8px 24px var(--accent-glow);
+}
+.btn-ghost {
+  font-family: var(--font-b); font-size: 11px; font-weight:700;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-muted); background: transparent;
+  border: 1px solid var(--border); padding: 14px 32px;
+  cursor: pointer; transition: all 0.15s;
+}
+.btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
+
+/* ─────────────── LANDING — Hero ─────────────── */
+.hero {
+  padding-top: 56px;
+  min-height: 100vh;
+  position: relative; overflow: hidden;
+  display: flex; align-items: center;
+}
+.hero-inner {
+  max-width: 1280px; width:100%;
+  margin: 0 auto; padding: 80px 48px 60px;
+  display: grid; grid-template-columns: 1fr 420px;
+  gap: 60px; align-items: center;
+}
+.hero-eyebrow {
+  display: inline-flex; align-items:center; gap:12px;
+  font-size: 10px; font-weight:700;
+  text-transform: uppercase; letter-spacing: 0.15em;
+  color: var(--accent); margin-bottom: 24px;
+}
+.hero-eyebrow::before {
+  content:''; display:block; width:32px; height:1px; background: var(--accent);
+}
+.hero-title {
+  font-family: var(--font-d);
+  font-size: clamp(72px, 10vw, 148px);
+  line-height: 0.88; letter-spacing: 0.01em;
+  color: var(--text); margin-bottom: 8px;
+}
+.hero-title .accent { color: var(--accent); }
+.cursor {
+  display: inline-block; width: 6px; background: var(--accent);
+  margin-left: 3px; vertical-align: middle; height: 0.78em;
+  animation: blink 1.1s step-end infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+.waveform {
+  display: flex; align-items: flex-end; gap: 3px;
+  height: 40px; margin-bottom: 0;
+}
+.wbar { width: 4px; background: var(--accent); opacity: 0.4; min-height: 3px; }
+
+.hero-sub {
+  font-size: 13px; color: var(--text-muted);
+  line-height: 1.85; max-width: 440px;
+  margin-top: 20px; margin-bottom: 36px;
+}
+.hero-sub em { color: var(--text); font-style: normal; font-weight:700; }
+.hero-ctas { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom: 40px; }
+.trust-row { display: flex; gap: 24px; align-items:center; flex-wrap: wrap; }
+.trust-item {
+  display: flex; align-items:center; gap:7px;
+  font-size: 10px; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.1em; color: var(--text-muted);
+}
+.trust-dot { width:5px; height:5px; border-radius:50%; }
+.trust-dot.on { background: var(--accent); box-shadow: 0 0 5px var(--accent-glow); }
+.trust-dot.off { background: var(--border2); }
+
+/* ── Hero gif ── */
+.hero-gif-wrap {
+  position: relative;
+}
+.hero-gif-wrap img {
+  width: 100%;
+  display: block;
+  border: 1px solid var(--border);
+  box-shadow:
+    0 32px 80px rgba(0,0,0,0.12),
+    0 8px 24px rgba(0,0,0,0.06);
+}
+.hero-gif-label {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 12px;
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em;
+  color: var(--text-muted);
+}
+.gif-live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 0 0 rgba(34,197,94,0.6);
+  animation: pulse-ring 1.5s ease-out infinite;
+}
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(34,197,94,0.6); }
+  70%  { box-shadow: 0 0 0 6px rgba(34,197,94,0); }
+  100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
+}
+.gif-live-text { color: #22c55e; }
+
+/* ─────────────── LANDING — Features ─────────────── */
+.features { padding: 100px 48px; max-width: 1280px; margin: 0 auto; }
+.sec-header {
+  display: flex; align-items:baseline; gap:20px;
+  padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 48px;
+}
+.sec-num { font-size:10px; font-weight:700; color: var(--text-dim); letter-spacing:0.1em; }
+.sec-title { font-family: var(--font-d); font-size: 44px; letter-spacing:0.02em; }
+.sec-title .a { color: var(--accent); }
+.sec-sub { margin-left:auto; font-size:11px; color:var(--text-muted); max-width:240px; text-align:right; line-height:1.6; }
+
+.feat-grid {
+  display: grid; grid-template-columns: repeat(3,1fr);
+  border: 1px solid var(--border);
+}
+
+/* ── The lifted card effect ── */
+.feat-card {
+  padding: 28px 24px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  position: relative;
+  cursor: default;
+  will-change: transform;
+  /* smooth lift, not spring — the spring is on the icon only */
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.35s ease,
+    border-color 0.2s ease;
+  z-index: 1;
+}
+.feat-card:nth-child(3n)  { border-right: none; }
+.feat-card:nth-child(n+4) { border-bottom: none; }
+
+.feat-card:hover {
+  transform: translateY(-10px);
+  box-shadow:
+    0 24px 48px rgba(0,0,0,0.10),
+    0 8px 16px rgba(0,0,0,0.06),
+    0 2px 4px rgba(0,0,0,0.04);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  z-index: 10;
+}
+
+.feat-card::before {
+  content: attr(data-idx);
+  position: absolute; top:20px; right:20px;
+  font-size:10px; font-weight:700; letter-spacing:0.1em; color: var(--text-dim);
+}
+
+/* Icon rides with the card — no independent motion */
+.feat-icon {
+  font-size: 26px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+  display: block;
+  transition: color 0.2s ease;
+}
+.feat-card:hover .feat-icon {
+  color: var(--accent);
+}
+
+.feat-name {
+  font-size:12px; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.05em; color:var(--text); margin-bottom:8px;
+}
+.feat-desc { font-size:11px; color:var(--text-muted); line-height:1.75; }
+
+/* ─────────────── LANDING — How it works ─────────────── */
+.how {
+  background: var(--surface2);
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+  padding: 80px 0;
+}
+.how-inner { max-width: 1280px; margin: 0 auto; padding: 0 48px; }
+.how-grid { display: grid; grid-template-columns: repeat(3,1fr); margin-top: 48px; }
+.how-step { padding: 0 48px 0 0; margin-right: 48px; border-right: 1px solid var(--border); }
+.how-step:last-child { border-right:none; padding-right:0; margin-right:0; }
+.how-n { font-family: var(--font-d); font-size: 72px; color: var(--text-dim); line-height: 1; margin-bottom: 20px; }
+.how-name { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:var(--text); margin-bottom:10px; }
+.how-desc { font-size:11px; color:var(--text-muted); line-height:1.8; }
+.how-tag {
+  display:inline-block; margin-top:16px;
+  font-size:9px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase;
+  color:var(--accent); background: var(--accent-dim);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+  padding:3px 10px;
+}
+
+/* ─────────────── LANDING — CTA Strip ─────────────── */
+.cta-strip {
+  padding: 80px 48px; max-width: 1280px; margin:0 auto;
+  display: flex; align-items:center; justify-content:space-between; gap:40px;
+}
+.cta-strip-h { font-family: var(--font-d); font-size: 60px; line-height:0.9; margin-bottom: 12px; }
+.cta-strip-h .a { color: var(--accent); }
+.cta-strip-sub { font-size:11px; color:var(--text-muted); }
+
+/* ─────────────── Footer ─────────────── */
+footer {
+  border-top: 1px solid var(--border); padding: 24px 48px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.foot-text { font-size:10px; color: var(--text-dim); }
+.foot-links { display:flex; gap:28px; }
+.foot-link {
+  font-size:10px; color:var(--text-muted);
+  cursor:pointer; text-decoration:none;
+  transition: color 0.15s; border:none; background:none;
+  font-family: var(--font-b);
+}
+.foot-link:hover { color:var(--accent); }
+
+/* ─────────────── DOWNLOAD PAGE ─────────────── */
+.dl-hero {
+  padding: 140px 48px 60px;
+  max-width: 1280px; margin:0 auto;
+  border-bottom: 1px solid var(--border);
+}
+.dl-eyebrow {
+  display:inline-flex; align-items:center; gap:12px;
+  font-size:10px; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.15em;
+  color:var(--accent); margin-bottom:16px;
+}
+.dl-eyebrow::before { content:''; display:block; width:32px; height:1px; background:var(--accent); }
+.dl-h {
+  font-family: var(--font-d);
+  font-size: clamp(64px, 9vw, 120px);
+  line-height: 0.88; margin-bottom:16px;
+}
+.dl-h .a { color:var(--accent); }
+.dl-sub { font-size:12px; color:var(--text-muted); max-width:400px; line-height:1.75; }
+
+/* ── Windows card ── */
+.dl-card-wrap { max-width: 1280px; margin: 0 48px; border: 1px solid var(--border); border-top: none; }
+.dl-card {
+  padding: 48px;
+  background: var(--surface);
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 48px; align-items: center;
+}
+.dl-card-badge {
+  display: inline-flex; align-items:center; gap:6px;
+  font-size:9px; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.12em;
+  padding: 3px 10px; margin-bottom: 16px;
+  color:var(--accent); background: var(--accent-dim);
+  border:1px solid color-mix(in srgb, var(--accent) 25%, transparent);
+}
+.dl-win-icon {
+  font-size: 40px;
+  color: var(--accent);
+  margin-bottom: 14px;
+  display: block;
+}
+.dl-platform-name { font-family:var(--font-d); font-size:52px; letter-spacing:0.02em; margin-bottom:6px; }
+.dl-version { font-size:10px; color:var(--text-muted); letter-spacing:0.08em; }
+.dl-card-right { display: flex; flex-direction:column; gap:12px; align-items:flex-end; min-width: 240px; }
+.dl-size-note { font-size:10px; color:var(--text-muted); text-align:right; line-height:1.7; }
+.btn-download {
+  font-family:var(--font-b); font-size:11px; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.1em;
+  color:#fff; background:var(--accent);
+  border:none; padding:14px 28px;
+  cursor:pointer; display:flex; align-items:center; gap:8px;
+  transition: all 0.2s; width:fit-content;
+}
+.btn-download:hover { opacity:0.85; transform:translateY(-2px); box-shadow:0 8px 24px var(--accent-glow); }
+
+/* ── Requirements + Steps ── */
+.dl-lower {
+  display: grid; grid-template-columns:1fr 1fr;
+  max-width:1280px; margin:0 48px;
+  border: 1px solid var(--border); border-top:none;
+}
+.dl-col { padding:40px; }
+.dl-col:first-child { border-right:1px solid var(--border); }
+.dl-col-hdr {
+  font-size:10px; font-weight:700;
+  text-transform:uppercase; letter-spacing:0.12em; color:var(--text-muted);
+  padding-bottom:14px; border-bottom:1px solid var(--border);
+}
+.req-row {
+  display:flex; align-items:flex-start; gap:12px;
+  padding:11px 0; border-bottom:1px solid var(--border);
+  font-size:11px; color:var(--text-muted); line-height:1.5;
+}
+.req-row:last-child { border-bottom:none; }
+.req-check { color:var(--accent); flex-shrink:0; font-size:13px; }
+.step-row {
+  display:flex; gap:16px; padding:12px 0;
+  border-bottom:1px solid var(--border); align-items:flex-start;
+}
+.step-row:last-child { border-bottom:none; }
+.step-n { font-family:var(--font-d); font-size:32px; color:var(--text-dim); line-height:1; flex-shrink:0; width:28px; }
+.step-body strong {
+  display:block; font-size:11px; font-weight:700; color:var(--text);
+  text-transform:uppercase; letter-spacing:0.05em; margin-bottom:3px;
+}
+.step-body p { font-size:10px; color:var(--text-muted); line-height:1.65; }
+
+.api-note {
+  max-width:1280px; margin:0 48px 60px;
+  padding:16px 20px;
+  background:var(--surface); border:1px solid var(--border);
+  border-top:none; border-left:3px solid var(--accent);
+  font-size:11px; color:var(--text-muted); line-height:1.7;
+}
+.api-note a { color:var(--accent); text-decoration:none; }
+.api-note a:hover { text-decoration:underline; }
+.api-note strong { color: var(--text); }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════ NAV ══════════════════ -->
+<nav>
+  <button class="nav-logo" onclick="showPage('landing')">charles<span>.</span></button>
+  <div class="nav-right">
+    <button class="nav-link">GitHub</button>
+    <button class="nav-link">Docs</button>
+    <button class="nav-cta" onclick="showPage('download')">↓ Download</button>
+  </div>
+</nav>
+
+
+<!-- ══════════════════ LANDING ══════════════════ -->
+<div id="page-landing" class="page active">
+
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-left">
+        <div class="hero-eyebrow">Voice-First AI Assistant — v1.0</div>
+
+        <h1 class="hero-title">
+          HEY<br>
+          <span class="accent">CHARLES</span><span class="cursor"></span>
+        </h1>
+
+        <div class="waveform" id="waveform"></div>
+
+        <p class="hero-sub">
+          Say <em>"Hey Charles"</em> and get answers, security scans, and news —
+          while you cook, clean, or code. Your voice never leaves <em>your machine.</em>
+        </p>
+
+        <div class="hero-ctas">
+          <button class="btn-primary" onclick="showPage('download')">↓ Download for Windows</button>
+          <button class="btn-ghost">View on GitHub →</button>
+        </div>
+
+        <div class="trust-row">
+          <div class="trust-item"><div class="trust-dot on"></div>Voice Stays Local</div>
+          <div class="trust-item"><div class="trust-dot on"></div>Open Source</div>
+          <div class="trust-item"><div class="trust-dot on"></div>Free Forever</div>
+          <div class="trust-item"><div class="trust-dot off"></div>No Account Needed</div>
+        </div>
+      </div>
+
+      <!-- Hero gif — actual app in action -->
+      <div class="hero-gif-wrap">
+        <img src="./assets/charles-demo.gif" alt="Charles app — voice interaction demo">
+        <div class="hero-gif-label">
+          <div class="gif-live-dot"></div>
+          <span class="gif-live-text">Live Session</span>
+          <span style="margin-left:8px">openwakeword · whisper · edge-tts</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Features -->
+  <section class="features">
+    <div class="sec-header">
+      <span class="sec-num">01</span>
+      <h2 class="sec-title">BUILT FOR<br><span class="a">DEVELOPERS.</span></h2>
+      <div class="sec-sub">Everything runs locally. Nothing phoned home.</div>
+    </div>
+    <div class="feat-grid">
+
+      <div class="feat-card" data-idx="01">
+        <i class="ph-bold ph-microphone feat-icon"></i>
+        <div class="feat-name">Wake Word Detection</div>
+        <div class="feat-desc">OpenWakeWord — open-source ONNX models, runs locally. Near-zero CPU when idle. No API key needed.</div>
+      </div>
+
+      <div class="feat-card" data-idx="02">
+        <i class="ph-bold ph-shield-check feat-icon"></i>
+        <div class="feat-name">Fully Offline Voice</div>
+        <div class="feat-desc">Whisper STT runs on your machine. Edge Neural TTS for natural speech. Your voice data never touches a server.</div>
+      </div>
+
+      <div class="feat-card" data-idx="03">
+        <i class="ph-bold ph-lightning feat-icon"></i>
+        <div class="feat-name">Fast & Responsive</div>
+        <div class="feat-desc">Sub-second wake detection. Whisper transcription under 500ms. Edge TTS starts streaming before the full response arrives.</div>
+      </div>
+
+      <div class="feat-card" data-idx="04">
+        <i class="ph-bold ph-desktop feat-icon"></i>
+        <div class="feat-name">Desktop Launcher</div>
+        <div class="feat-desc">One-click Electron app starts and stops everything. System tray integration. No terminal required to run Charles.</div>
+      </div>
+
+      <div class="feat-card" data-idx="05">
+        <i class="ph-bold ph-magnifying-glass feat-icon"></i>
+        <div class="feat-name">Security Skills</div>
+        <div class="feat-desc">Built-in skills for VirusTotal scans, CVE lookups, and tech news — triggered automatically by what you ask.</div>
+      </div>
+
+      <div class="feat-card" data-idx="06">
+        <i class="ph-bold ph-database feat-icon"></i>
+        <div class="feat-name">Conversation Memory</div>
+        <div class="feat-desc">SQLite stores your full conversation history locally. Context carries across sessions. Nothing in the cloud.</div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <div class="how">
+    <div class="how-inner">
+      <div class="sec-header">
+        <span class="sec-num">02</span>
+        <h2 class="sec-title">UP IN<br><span class="a">THREE STEPS.</span></h2>
+      </div>
+      <div class="how-grid">
+        <div class="how-step">
+          <div class="how-n">01</div>
+          <div class="how-name">Download</div>
+          <div class="how-desc">One installer. Python 3.11, Whisper, and all dependencies are bundled — no setup required on your end.</div>
+          <span class="how-tag">~1.5GB · All-in-one</span>
+        </div>
+        <div class="how-step">
+          <div class="how-n">02</div>
+          <div class="how-name">Add Your API Key</div>
+          <div class="how-desc">Paste a free OpenRouter API key into the setup wizard. That's the only thing Charles can't bundle for you.</div>
+          <span class="how-tag">Free · No card needed</span>
+        </div>
+        <div class="how-step">
+          <div class="how-n">03</div>
+          <div class="how-name">Say "Hey Charles"</div>
+          <div class="how-desc">Click Start in the launcher. Charles is live — hands-free, private, fully yours.</div>
+          <span class="how-tag">Always listening</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA strip -->
+  <div class="cta-strip">
+    <div>
+      <div class="cta-strip-h">READY TO<br><span class="a">SHIP IT.</span></div>
+      <div class="cta-strip-sub">Free, open source, self-hosted. Windows build available now.</div>
+    </div>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <button class="btn-primary" onclick="showPage('download')">↓ Download for Windows</button>
+      <button class="btn-ghost">View Source →</button>
+    </div>
+  </div>
+
+  <footer>
+    <div class="foot-text">© 2026 Charles. MIT License.</div>
+    <div class="foot-links">
+      <button class="foot-link" onclick="showPage('download')">Download</button>
+      <button class="foot-link">GitHub</button>
+      <button class="foot-link">Releases</button>
+      <button class="foot-link">Docs</button>
+    </div>
+  </footer>
+</div>
+
+
+<!-- ══════════════════ DOWNLOAD ══════════════════ -->
+<div id="page-download" class="page">
+
+  <div class="dl-hero">
+    <div class="dl-eyebrow">v1.0.0 — Latest Release</div>
+    <h1 class="dl-h">DOWN<br><span class="a">LOAD.</span></h1>
+    <p class="dl-sub">Free, open source, self-hosted. Everything is bundled — Python, Whisper, and all dependencies included. No install step.</p>
+  </div>
+
+  <div class="dl-card-wrap">
+    <div class="dl-card">
+      <div class="dl-card-left">
+        <div class="dl-card-badge">● Available Now</div>
+        <i class="ph-bold ph-windows-logo dl-win-icon"></i>
+        <div class="dl-platform-name">Windows</div>
+        <div class="dl-version">v1.0.0 &nbsp;·&nbsp; Windows 10 / 11 &nbsp;·&nbsp; 64-bit</div>
+      </div>
+      <div class="dl-card-right">
+        <a class="btn-download" href="https://github.com/JustinSu11/charles/releases/latest/download/Charles%20Setup%201.0.0.exe" download>↓ Download Charles.exe</a>
+        <div class="dl-size-note">
+          ~1.5GB — includes bundled Python 3.11,<br>
+          Whisper base model, and all dependencies.<br>
+          No additional downloads on first launch.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dl-lower">
+    <div class="dl-col">
+      <div class="dl-col-hdr">System Requirements</div>
+      <div class="req-row"><i class="ph-bold ph-check req-check"></i>Windows 10 or 11 (64-bit)</div>
+      <div class="req-row"><i class="ph-bold ph-check req-check"></i>6GB RAM minimum (8GB recommended)</div>
+      <div class="req-row"><i class="ph-bold ph-check req-check"></i>Microphone + speakers or headset</div>
+      <div class="req-row"><i class="ph-bold ph-check req-check"></i>~2GB free disk space</div>
+      <div class="req-row"><i class="ph-bold ph-check req-check"></i>Internet connection for AI responses</div>
+      <div class="req-row"><i class="ph-bold ph-check req-check"></i>Free OpenRouter API key</div>
+    </div>
+    <div class="dl-col">
+      <div class="dl-col-hdr">Getting Started</div>
+      <div class="step-row">
+        <div class="step-n">1</div>
+        <div class="step-body">
+          <strong>Run Charles.exe</strong>
+          <p>Windows SmartScreen may appear — click "More info" → "Run anyway". Expected for unsigned installers.</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-n">2</div>
+        <div class="step-body">
+          <strong>Paste your API key</strong>
+          <p>The setup wizard opens openrouter.ai automatically. Create a free account, copy your key, paste it in.</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-n">3</div>
+        <div class="step-body">
+          <strong>Click "Start Charles"</strong>
+          <p>The launcher spins up the API service and voice pipeline. Ready in a few seconds.</p>
+        </div>
+      </div>
+      <div class="step-row">
+        <div class="step-n">4</div>
+        <div class="step-body">
+          <strong>Say "Hey Charles"</strong>
+          <p>You're live. Try: "What security news dropped today?" or "Check for React CVEs this week."</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="api-note">
+    <strong>Need an API key?</strong> Visit <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a> — no credit card required, takes about a minute to sign up.
+    Once you're in the app you can pick any model available on OpenRouter — free or paid, fast or capable, whatever fits how you use Charles.
+  </div>
+
+  <footer>
+    <div class="foot-text">© 2026 Charles. MIT License.</div>
+    <div class="foot-links">
+      <button class="foot-link" onclick="showPage('landing')">Home</button>
+      <button class="foot-link">GitHub</button>
+      <button class="foot-link">Releases</button>
+      <button class="foot-link">Docs</button>
+    </div>
+  </footer>
+</div>
+
+
+<!-- ══════════════════ JS ══════════════════ -->
+<script>
+function showPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + name).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Animated waveform
+(function() {
+  const wrap = document.getElementById('waveform');
+  if (!wrap) return;
+  const BARS = 48;
+  const bars = [];
+  for (let i = 0; i < BARS; i++) {
+    const b = document.createElement('div');
+    b.className = 'wbar';
+    b.style.height = '3px';
+    wrap.appendChild(b);
+    bars.push(b);
+  }
+  let t = 0, running = true;
+  function frame() {
+    if (!running) return;
+    t += 0.055;
+    bars.forEach((b, i) => {
+      const n = i / BARS;
+      const h =
+        Math.abs(Math.sin(t * 1.3 + n * 6.2)) * 18 +
+        Math.abs(Math.sin(t * 2.1 + n * 3.7)) * 10 +
+        Math.abs(Math.sin(t * 0.8 + n * 11))  *  6 + 3;
+      b.style.height = h + 'px';
+      b.style.opacity = (0.25 + (h / 38) * 0.55).toFixed(2);
+    });
+    requestAnimationFrame(frame);
+  }
+  frame();
+  document.addEventListener('visibilitychange', () => {
+    running = !document.hidden;
+    if (running) frame();
+  });
+})();
+</script>
+
+</body>
+</html>
