@@ -193,7 +193,16 @@ async function startVoice() {
       stdio: ['pipe', 'pipe', 'pipe'],  // stdin piped so we can send INTERRUPT
     })
     voiceProcess = vproc
-    vproc.stderr.on('data', (d) => process.stderr.write(`[Voice] ${d}`))
+
+    // In the packaged app stderr isn't visible — tee it to a log file in userData
+    // so crashes can be diagnosed. File is overwritten each start attempt.
+    const voiceLogPath = path.join(app.getPath('userData'), 'voice-error.log')
+    const voiceLog = fs.createWriteStream(voiceLogPath, { flags: 'w' })
+    vproc.stderr.on('data', (d) => {
+      process.stderr.write(`[Voice] ${d}`)
+      voiceLog.write(d)
+    })
+    vproc.on('exit', () => voiceLog.end())
     vproc.stdout.on('data', (d) => {
       for (const line of d.toString().split('\n')) {
         const t = line.trim()
