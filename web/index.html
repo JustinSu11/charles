@@ -410,6 +410,87 @@ footer {
 .api-note a { color:var(--accent); text-decoration:none; }
 .api-note a:hover { text-decoration:underline; }
 .api-note strong { color: var(--text); }
+
+/* ─────────────── Mobile ─────────────── */
+@media (max-width: 768px) {
+  nav { padding: 0 20px; }
+  .nav-link { display: none; }
+
+  .hero-inner {
+    grid-template-columns: 1fr;
+    padding: 60px 20px 40px;
+    gap: 32px;
+  }
+  .hero-gif-wrap { display: none; }
+  .hero-eyebrow { font-size: 9px; }
+  .hero-title { font-size: clamp(64px, 18vw, 110px); }
+  .hero-sub { font-size: 13px; }
+  .hero-ctas { flex-direction: column; }
+  .hero-ctas .btn-primary,
+  .hero-ctas .btn-ghost { width: 100%; text-align: center; justify-content: center; }
+  .hero-tags { gap: 12px; }
+
+  .sec-inner { padding: 60px 20px; }
+  .sec-title { font-size: 32px; }
+  .sec-right { font-size: 12px; margin-top: 8px; }
+
+  .feat-grid { grid-template-columns: 1fr 1fr; }
+  .feat-card:nth-child(3n)  { border-right: 1px solid var(--border); }
+  .feat-card:nth-child(2n)  { border-right: none; }
+  .feat-card:nth-child(n+5) { border-bottom: none; }
+  .feat-card:nth-child(n+4) { border-bottom: 1px solid var(--border); }
+
+  .how-grid { grid-template-columns: 1fr; margin-top: 32px; }
+  .how-step {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 0 0 32px;
+    margin: 0 0 32px;
+  }
+  .how-step:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+  .how-n { font-size: 52px; }
+
+  .cta-strip { padding: 48px 20px; }
+  .cta-strip-h { font-size: 40px; }
+  .cta-strip-btns { flex-direction: column; gap: 12px; }
+  .cta-strip-btns .btn-primary,
+  .cta-strip-btns .btn-ghost { width: 100%; text-align: center; }
+
+  footer { padding: 20px; flex-direction: column; gap: 16px; text-align: center; }
+  .foot-links { gap: 20px; flex-wrap: wrap; justify-content: center; }
+
+  /* Download page */
+  .dl-inner { padding: 60px 20px 40px; }
+  .dl-h { font-size: clamp(52px, 16vw, 90px); }
+  .dl-card { grid-template-columns: 1fr; gap: 24px; padding: 28px 20px; }
+  .dl-card-right { align-items: flex-start; min-width: unset; }
+  .btn-download { width: 100%; text-align: center; }
+  .dl-platform-name { font-size: 36px; }
+  .dl-lower { grid-template-columns: 1fr; margin: 0 20px; }
+  .dl-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
+}
+
+@media (max-width: 480px) {
+  nav { padding: 0 16px; }
+
+  .hero-inner { padding: 56px 16px 36px; }
+  .hero-title { font-size: clamp(56px, 20vw, 90px); }
+
+  .sec-inner { padding: 48px 16px; }
+  .feat-grid { grid-template-columns: 1fr; }
+  .feat-card:nth-child(2n)  { border-right: none; }
+  .feat-card:nth-child(n+4) { border-bottom: none; }
+  .feat-card:nth-child(n+5) { border-bottom: none; }
+  .feat-card:not(:last-child) { border-bottom: 1px solid var(--border); }
+
+  .cta-strip { padding: 36px 16px; }
+  footer { padding: 16px; }
+
+  .dl-inner { padding: 48px 16px 32px; }
+  .dl-card { padding: 24px 16px; }
+  .dl-lower { margin: 0 16px; }
+  .dl-col { padding: 28px 16px; }
+}
 </style>
 </head>
 <body>
