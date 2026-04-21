@@ -681,10 +681,12 @@ function showPage(name) {
     wrap.appendChild(b);
     bars.push(b);
   }
-  let t = 0, running = true;
-  function frame() {
-    if (!running) return;
-    t += 0.055;
+  let t = 0, lastTs = null, rafId = null;
+  function frame(ts) {
+    if (lastTs === null) lastTs = ts;
+    const dt = Math.min((ts - lastTs) / 1000, 0.05);
+    lastTs = ts;
+    t += dt * 0.9;
     bars.forEach((b, i) => {
       const n = i / BARS;
       const h =
@@ -694,12 +696,17 @@ function showPage(name) {
       b.style.height = h + 'px';
       b.style.opacity = (0.25 + (h / 38) * 0.55).toFixed(2);
     });
-    requestAnimationFrame(frame);
+    rafId = requestAnimationFrame(frame);
   }
-  frame();
+  rafId = requestAnimationFrame(frame);
   document.addEventListener('visibilitychange', () => {
-    running = !document.hidden;
-    if (running) frame();
+    if (document.hidden) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+      lastTs = null;
+    } else if (!rafId) {
+      rafId = requestAnimationFrame(frame);
+    }
   });
 })();
 </script>
