@@ -70,7 +70,7 @@ async def get_openrouter_response(
         "messages": messages,
     }
 
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=120.0) as client:
         response = await client.post(OPENROUTER_API_URL, json=payload, headers=headers)
         response.raise_for_status() #throws HTTPStatus Error on 4xx/5xx
     
