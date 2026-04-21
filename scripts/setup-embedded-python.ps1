@@ -47,12 +47,23 @@ Expand-Archive $zipFile -DestinationPath $dest -Force
 Remove-Item $zipFile
 Write-Host "Extracted to $dest" -ForegroundColor Green
 
-# ── 3. Enable site-packages (uncomment '#import site' in python311._pth) ─────
+# ── 3. Configure python311._pth ───────────────────────────────────────────────
+# The ._pth file in embeddable Python takes FULL control of sys.path.
+# PYTHONPATH and all other env-var path tricks are ignored when this file exists.
+# We must explicitly list every directory that needs to be importable:
+#   - Uncomment 'import site' to enable the Lib/site-packages we're about to fill
+#   - Add '../api'   so  import fastapi / uvicorn / app.main works in the packaged app
+#   - Add '../voice' so  import audio / stt / tts / wake_word works in the packaged app
+# (Paths in ._pth are relative to the python.exe location; ../voice and ../api
+#  resolve correctly once extraResources places them next to resources/python/.)
 $pthFile = Join-Path $dest "python311._pth"
 if (Test-Path $pthFile) {
-    Write-Host "Enabling site-packages in python311._pth ..." -ForegroundColor Yellow
+    Write-Host "Configuring python311._pth (site-packages + api + voice) ..." -ForegroundColor Yellow
     $pthContent = Get-Content $pthFile -Raw
     $pthContent = $pthContent -replace "#import site", "import site"
+    # Append script-directory entries on new lines (idempotent — skip if already present)
+    if ($pthContent -notmatch "\.\./voice") { $pthContent += "`n../voice" }
+    if ($pthContent -notmatch "\.\./api")   { $pthContent += "`n../api"   }
     Set-Content $pthFile $pthContent -NoNewline
     Write-Host "Done." -ForegroundColor Green
 } else {
