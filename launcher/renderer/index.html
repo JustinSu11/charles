@@ -181,8 +181,8 @@
     }
     #close-btn-tray { background: var(--accent); color: #fff; }
     #close-btn-tray:hover { background: #2563eb; }
-    #close-btn-quit { background: #1f2937; color: #f87171; border: 1px solid #374151; }
-    #close-btn-quit:hover { background: #7f1d1d; border-color: #991b1b; }
+    #close-btn-quit { background: #1f2937; color: #f87171; border: 1px solid #374151 !important; }
+    #close-btn-quit:hover { background: #7f1d1d; border-color: #991b1b !important; }
 
     /* ── Input bar ── */
     #input-bar {
@@ -260,6 +260,45 @@
     #clear-chat-btn:hover { background:#1f2937; color:#9ca3af; }
     #msg-input:disabled { opacity:.4; cursor:not-allowed; }
 
+    /* ── Audio debug panel ── */
+    #debug-panel {
+      display: none;
+      padding: 8px 16px;
+      border-bottom: 1px solid var(--border);
+      background: #0a0a0a;
+      font-family: "Consolas", monospace;
+      font-size: .72rem;
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    #debug-panel.visible { display: block; }
+    .debug-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 4px;
+    }
+    .debug-row:last-child { margin-bottom: 0; }
+    .debug-label { width: 110px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .debug-bar-track {
+      flex: 1; height: 6px; background: #1a1a1a;
+      border-radius: 3px; overflow: hidden;
+    }
+    .debug-bar-fill {
+      height: 100%; width: 0%; border-radius: 3px;
+      transition: width 80ms linear;
+      background: #3b82f6;
+    }
+    .debug-bar-fill.rms   { background: #22c55e; }
+    .debug-bar-fill.warn  { background: #f59e0b; }
+    .debug-bar-fill.hit   { background: #a78bfa; }
+    .debug-value { width: 40px; text-align: right; flex-shrink: 0; }
+    #debug-btn {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 3px 10px; font-size: .72rem; cursor: pointer;
+    }
+    #debug-btn.active { border-color: #3b82f6; color: #3b82f6; }
+    #debug-btn:hover  { background: #1a1a1a; }
+
     #model-select {
       background: var(--surface);
       border: 1px solid var(--border);
@@ -299,6 +338,7 @@
   <button id="stop-btn"      style="display:none">Stop</button>
   <button id="interrupt-btn"   style="display:none">⏹ Interrupt</button>
   <button id="clear-chat-btn" title="Clear conversation history">🗑 Clear</button>
+  <button id="debug-btn" title="Toggle audio debug panel">Debug</button>
   <select id="model-select" title="Active model">
     <option disabled selected>Loading models…</option>
   </select>
@@ -306,6 +346,15 @@
     <button id="btn-minimize" title="Minimize">&#8722;</button>
     <button id="btn-close"    title="Close">&#x2715;</button>
   </div>
+</div>
+
+<div id="debug-panel">
+  <div class="debug-row" id="debug-row-rms">
+    <span class="debug-label">Mic level</span>
+    <div class="debug-bar-track"><div class="debug-bar-fill rms" id="debug-fill-rms"></div></div>
+    <span class="debug-value" id="debug-val-rms">—</span>
+  </div>
+  <!-- model score rows injected by JS -->
 </div>
 
 <div id="messages"></div>
@@ -695,10 +744,69 @@ $closeOverlay.addEventListener('click', (e) => {
 });
 document.getElementById('close-btn-tray').addEventListener('click', () => {
   $closeOverlay.classList.remove('visible');
-  window.electronAPI.closeWindow();   // hides to tray (existing behaviour)
+  window.electronAPI.closeWindow();
 });
 document.getElementById('close-btn-quit').addEventListener('click', () => {
-  window.electronAPI.quitApp();       // kills all processes and quits
+  window.electronAPI.quitApp();
+});
+
+// ── Audio debug panel ─────────────────────────────────────────────────────────
+const $debugPanel  = document.getElementById('debug-panel');
+const $debugBtn    = document.getElementById('debug-btn');
+const $debugFillRms = document.getElementById('debug-fill-rms');
+const $debugValRms  = document.getElementById('debug-val-rms');
+let debugVisible = false;
+const _debugModelRows = {};   // modelName → { fill, val } DOM refs
+
+$debugBtn.addEventListener('click', () => {
+  debugVisible = !debugVisible;
+  $debugPanel.classList.toggle('visible', debugVisible);
+  $debugBtn.classList.toggle('active', debugVisible);
+});
+
+function _getOrCreateModelRow(name) {
+  if (_debugModelRows[name]) return _debugModelRows[name];
+  const row = document.createElement('div');
+  row.className = 'debug-row';
+  const label = document.createElement('span');
+  label.className = 'debug-label';
+  label.textContent = name;
+  label.title = name;
+  const track = document.createElement('div');
+  track.className = 'debug-bar-track';
+  const fill = document.createElement('div');
+  fill.className = 'debug-bar-fill';
+  track.appendChild(fill);
+  const val = document.createElement('span');
+  val.className = 'debug-value';
+  row.appendChild(label);
+  row.appendChild(track);
+  row.appendChild(val);
+  $debugPanel.appendChild(row);
+  _debugModelRows[name] = { fill, val };
+  return _debugModelRows[name];
+}
+
+const cleanupDebug = window.electronAPI.onVoiceDebug((payload) => {
+  if (!debugVisible) return;
+  const { rms, ...modelScores } = payload;
+
+  // Mic level bar (RMS normalised 0–1, displayed as %)
+  if (rms !== undefined) {
+    const pct = Math.min(rms * 100 * 5, 100);  // ×5 so normal speech shows clearly
+    $debugFillRms.style.width = `${pct}%`;
+    $debugFillRms.className = 'debug-bar-fill rms' + (rms > 0.15 ? ' warn' : '');
+    $debugValRms.textContent = rms.toFixed(4);
+  }
+
+  // Per-model score bars
+  for (const [name, score] of Object.entries(modelScores)) {
+    const { fill, val } = _getOrCreateModelRow(name);
+    const pct = Math.min(score * 100 / 0.5 * 50, 100); // scale so threshold=50%
+    fill.style.width = `${pct}%`;
+    fill.className = 'debug-bar-fill' + (score >= 0.5 ? ' hit' : '');
+    val.textContent = score.toFixed(4);
+  }
 });
 
 const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => {
@@ -713,7 +821,7 @@ const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => 
 });
 const cleanupVoice      = window.electronAPI.onVoiceState(({ state }) => setVoiceState(state));
 const cleanupTranscript = window.electronAPI.onVoiceTranscript(({ text }) => showVoiceTranscript(text));
-window.addEventListener('beforeunload', () => { cleanupStatus(); cleanupVoice(); cleanupTranscript(); });
+window.addEventListener('beforeunload', () => { cleanupStatus(); cleanupVoice(); cleanupTranscript(); cleanupDebug(); });
 
 // Initial state — API is auto-starting in the background
 setStatus('initializing');

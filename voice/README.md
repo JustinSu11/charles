@@ -5,9 +5,9 @@ Native Python voice service for Charles — runs on the host machine so it can a
 ## What goes here
 
 - `main.py` — Entry point; starts the always-on wake word loop
-- `wake_word.py` — Porcupine integration ("Hey Charles" detection)
+- `wake_word.py` — OpenWakeWord integration (local, no API key required)
 - `stt.py` — Whisper speech-to-text pipeline (microphone → text)
-- `tts.py` — Piper text-to-speech pipeline (text → speakers)
+- `tts.py` — Edge TTS text-to-speech pipeline (text → speakers)
 - `audio.py` — Audio device enumeration, capture buffer, silence detection
 - `api_client.py` — HTTP client that sends transcribed text to `POST /chat`
 - `requirements.txt` — Python dependencies (see below)
@@ -21,24 +21,27 @@ cd voice
 pip install -r requirements.txt
 ```
 
-### 2. Install Piper TTS binary
+### 2. Add a wake word model (optional)
 
-Download the binary for your platform from https://github.com/rhasspy/piper/releases and place it at:
+By default Charles listens for **"Hey Jarvis"** using a built-in OpenWakeWord model — no setup needed. To use a custom wake phrase (e.g. "Hey Charles"), place an `.onnx` model file in `voice/models/`:
 
-- Windows: `voice/bin/piper.exe`
-- macOS/Linux: `voice/bin/piper`
+```
+voice/models/hey-charles.onnx
+```
 
-### 3. Generate wake word model
+See [documentation/adding-openwakeword-model.md](../documentation/adding-openwakeword-model.md) for full instructions.
 
-1. Sign up at https://console.picovoice.ai/
-2. Create a custom "Hey Charles" wake word for your target platform
-3. Download the `.ppn` file and place it at `voice/models/hey-charles.ppn`
+### 3. Configure environment
 
-### 4. Configure environment
+Copy `../.env.example` to `../.env` and fill in your `OPENROUTER_API_KEY`.
 
-Copy `../.env.example` to `../.env` and fill in your `PICOVOICE_ACCESS_KEY`.
+Optionally tune the wake word detection threshold (default `0.5`):
 
-### 5. Run
+```
+WAKE_WORD_THRESHOLD=0.5
+```
+
+### 4. Run
 
 ```bash
 python main.py
@@ -50,7 +53,7 @@ python main.py
 Microphone
     │
     ▼
-pvporcupine (wake word "Hey Charles")
+OpenWakeWord (wake word — local, no API key)
     │  detected
     ▼
 PyAudio capture buffer + silence detection
@@ -62,7 +65,7 @@ openai-whisper (STT — local, offline)
 POST /chat  →  Charles API  →  OpenRouter  →  response text
     │
     ▼
-piper-tts (TTS — local, offline)
+edge-tts (TTS — Microsoft Azure Neural voices)
     │
     ▼
 Speakers
@@ -85,3 +88,15 @@ Speakers
 | medium | 1.5 GB | ~0.2×       | Best     |
 
 Default: `base`. Override with `WHISPER_MODEL=small` in `.env`.
+
+## Wake word threshold tuning
+
+OpenWakeWord returns a confidence score (0.0–1.0) for each model on every audio frame. Detection fires when the score exceeds `WAKE_WORD_THRESHOLD`.
+
+| Value | Effect |
+| ----- | ------ |
+| `0.3` | More sensitive — fewer missed detections, more false positives |
+| `0.5` | Default — balanced |
+| `0.7` | Less sensitive — fewer false positives, may miss quiet speech |
+
+Adjust in `.env` if Charles triggers too often or not often enough in your environment.

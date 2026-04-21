@@ -104,10 +104,12 @@
     #install-log {
       flex: 1; background: #0a0a0a;
       border: 1px solid var(--border); border-radius: 8px;
-      padding: 12px; overflow-y: auto;
+      padding: 12px; overflow-y: scroll;
+      max-height: 260px;
       font-family: "Consolas", "SF Mono", monospace;
       font-size: .78rem; color: #9ca3af;
       white-space: pre-wrap; word-break: break-all;
+      user-select: text; -webkit-user-select: text;
     }
 
     /* API key inputs */
@@ -127,6 +129,7 @@
       font-size: .8rem; padding: 8px 12px; border-radius: 6px;
       border: 1px solid var(--border); min-height: 36px;
       display: none; align-items: center; gap: 8px;
+      margin-bottom: 12px;
     }
     .key-status.ok   { border-color: #166534; background: #14532d22; color: var(--success); display: flex; }
     .key-status.fail { border-color: #991b1b; background: #7f1d1d22; color: var(--error);   display: flex; }
@@ -186,13 +189,14 @@
       <p style="color:var(--text); line-height:2.2;">
         ① Verify Python 3.10+ is installed<br>
         ② Install Python packages for the API and voice service<br>
-        ③ Save your API keys to <code>.env</code>
+        ③ Save your OpenRouter API key to <code>.env</code>
       </p>
       <p style="font-size:.8rem; color:var(--text-muted); border-top:1px solid var(--border); padding-top:14px; margin-top:4px; line-height:1.7;">
         🔒 <strong style="color:var(--text)">Privacy note:</strong>
         Voice responses are synthesised by Microsoft Azure Neural TTS via the <code>edge-tts</code> library.
         The text of each response is sent to Microsoft's servers to generate audio.
-        All other processing (wake word, speech-to-text, AI chat) runs locally or through your own API keys.
+        Wake word detection runs entirely on-device (no API key required).
+        All other processing (speech-to-text, AI chat) runs locally or through your own API keys.
       </p>
     </div>
 
@@ -209,27 +213,26 @@
     <!-- Step 2: Dependencies -->
     <div class="panel" id="panel-2">
       <h2>Install Dependencies</h2>
-      <p>Installing Python packages for the API and voice service. This may take a minute on first run.</p>
+      <p>Installing Python packages for the API and voice service. This may take a few minutes — <strong style="color:var(--text)">torch (~2 GB)</strong> downloads on first run.</p>
       <div id="install-log">Waiting to start…</div>
+      <div style="display:flex; justify-content:flex-end; margin-top:6px;">
+        <button id="copy-log-btn" style="background:transparent;border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:4px 12px;font-size:.75rem;cursor:pointer;">Copy Log</button>
+      </div>
+      <div id="install-error" style="display:none;margin-top:8px;padding:10px 14px;border-radius:8px;border:1px solid #991b1b;background:#7f1d1d22;color:#fca5a5;font-size:.82rem;line-height:1.5;"></div>
     </div>
 
     <!-- Step 3: Connect accounts -->
     <div class="panel" id="panel-3">
-      <h2>Connect Accounts</h2>
-      <p>Charles needs two things: an AI provider and a wake word licence. Both are free.</p>
+      <h2>API Keys</h2>
+      <p>Charles needs an AI provider key to answer questions. Wake word detection runs fully locally — no additional account required.</p>
+
+      <div class="key-status" id="key-status"></div>
 
       <!-- OpenRouter API key -->
       <div class="field">
         <label>AI Provider — OpenRouter API Key</label>
         <input type="password" id="input-openrouter-key" placeholder="sk-or-v1-…" autocomplete="off" spellcheck="false" />
         <span class="hint">Free at <a id="link-openrouter-keys">openrouter.ai/keys</a> — sign in with Google or GitHub, then create a key</span>
-      </div>
-
-      <!-- Picovoice key -->
-      <div class="field">
-        <label>Wake Word Licence — Picovoice</label>
-        <input type="password" id="input-picovoice" placeholder="Your Picovoice access key" autocomplete="off" spellcheck="false" />
-        <span class="hint">Free key at <a id="link-picovoice">console.picovoice.ai</a> — needed so the "Hey Charles" SDK can run</span>
       </div>
 
       <!-- VirusTotal key (optional) -->
@@ -239,7 +242,6 @@
         <span class="hint">Free at <a id="link-virustotal">virustotal.com</a> — enables Charles to report whether a file or URL is malicious</span>
       </div>
 
-      <div class="key-status" id="key-status"></div>
     </div>
 
     <!-- Step 4: Done -->
@@ -339,8 +341,10 @@ async function runInstall() {
   if (installing) return
   installing = true
   $next.disabled = true
-  const $log = document.getElementById('install-log')
+  const $log      = document.getElementById('install-log')
+  const $errBox   = document.getElementById('install-error')
   $log.textContent = ''
+  $errBox.style.display = 'none'
   if (cleanupLog) { cleanupLog(); cleanupLog = null }
   cleanupLog = window.wizardAPI.onInstallProgress(({ text }) => {
     $log.textContent += text
@@ -350,7 +354,24 @@ async function runInstall() {
   installing = false
   if (cleanupLog) { cleanupLog(); cleanupLog = null }
   markStep(2, r.ok)
+  if (!r.ok) {
+    // Surface the last error line so users don't have to scroll to find it
+    const lines = $log.textContent.trim().split('\n')
+    const errLine = lines.filter(l => l.toLowerCase().includes('error')).at(-1) || r.error || 'Installation failed.'
+    $errBox.textContent = '✗ ' + errLine + '\n\nScroll the log above for full details, or click "Copy Log" to share with your team.'
+    $errBox.style.display = 'block'
+  }
 }
+
+// Copy log to clipboard
+document.getElementById('copy-log-btn').addEventListener('click', () => {
+  const text = document.getElementById('install-log').textContent
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.getElementById('copy-log-btn')
+    btn.textContent = 'Copied!'
+    setTimeout(() => { btn.textContent = 'Copy Log' }, 2000)
+  })
+})
 
 // ── External links ─────────────────────────────────────────────────────────────
 document.getElementById('link-openrouter-keys').addEventListener('click', () => {
@@ -366,29 +387,14 @@ $next.addEventListener('click', async () => {
 
   if (current === 3) {
     const openrouterKey = document.getElementById('input-openrouter-key').value.trim()
-    const pvKey         = document.getElementById('input-picovoice').value.trim()
     const vtKey         = document.getElementById('input-virustotal').value.trim()
 
     if (!openrouterKey) {
       setKeyStatus('⚠️', 'OpenRouter API key is required.', 'fail')
       return
     }
-    if (!pvKey) {
-      setKeyStatus('⚠️', 'Picovoice access key is required.', 'fail')
-      return
-    }
 
-    setKeyStatus('⏳', 'Validating Picovoice key…', 'checking')
-    $next.disabled = true
-
-    const r = await window.wizardAPI.validatePicovoice(pvKey)
-    if (!r.ok) {
-      setKeyStatus('❌', r.error, 'fail')
-      $next.disabled = false
-      return
-    }
-
-    await window.wizardAPI.saveKeys({ openrouterKey, picovoiceKey: pvKey, virustotalKey: vtKey })
+    await window.wizardAPI.saveKeys({ openrouterKey, virustotalKey: vtKey })
     const vtNote = vtKey ? '' : ' (VirusTotal skipped)'
     setKeyStatus('✅', `All set — keys saved${vtNote}`, 'ok')
     markStep(3, true)
@@ -401,9 +407,6 @@ $back.addEventListener('click', () => { if (current > 0) goTo(current - 1) })
 document.getElementById('btn-close').addEventListener('click', () => window.wizardAPI.close())
 
 // External links — must go via main process shell.openExternal (window.open opens an Electron window)
-document.getElementById('link-picovoice').addEventListener('click', () => {
-  window.wizardAPI.openExternal('https://console.picovoice.ai/')
-})
 document.getElementById('link-virustotal').addEventListener('click', () => {
   window.wizardAPI.openExternal('https://www.virustotal.com/gui/sign-in')
 })
