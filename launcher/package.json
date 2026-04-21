@@ -5,9 +5,12 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist":  "electron-builder"
+    "predist": "pwsh -ExecutionPolicy Bypass -File ../scripts/setup-embedded-python.ps1",
+    "dist": "electron-builder"
   },
-  "dependencies": {},
+  "dependencies": {
+    "electron-updater": "^6.8.3"
+  },
   "devDependencies": {
     "electron": "^29.0.0",
     "electron-builder": "^24.0.0"
@@ -15,10 +18,27 @@
   "build": {
     "appId": "com.charles.assistant",
     "productName": "Charles",
-    "win": { "target": "nsis" },
+    "win": {
+      "target": "nsis"
+    },
     "extraResources": [
-      { "from": "../api",   "to": "api"   },
-      { "from": "../voice", "to": "voice" }
-    ]
+      {
+        "from": "../api",
+        "to": "api"
+      },
+      {
+        "from": "../voice",
+        "to": "voice"
+      },
+      {
+        "from": "../resources/python",
+        "to": "python"
+      }
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "JustinSu11",
+      "repo": "charles"
+    }
   }
 }

@@ -8,6 +8,7 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import text
+from unittest.mock import AsyncMock, patch
 
 from app.main import app
 from app.database import get_db
@@ -65,3 +66,11 @@ async def client():
         transport=ASGITransport(app=app), base_url="http://test"
     ) as ac:
         yield ac
+
+
+@pytest_asyncio.fixture
+async def patched_openrouter():
+    """Yields a controllable AsyncMock for get_openrouter_response."""
+    mock = AsyncMock(return_value="mocked reply")
+    with patch("app.routers.chat.get_openrouter_response", new=mock):
+        yield mock

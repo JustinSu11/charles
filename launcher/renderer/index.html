@@ -244,6 +244,7 @@
 
     #voice-pill { font-size:.72rem; padding:2px 8px; border-radius:999px; display:none; }
     #voice-pill.standby      { display:inline; background:#1c2330; color:#6b7280; }
+    #voice-pill.loading      { display:inline; background:#1c2330; color:#6b7280; }
     #voice-pill.listening    { display:inline; background:#2e1065; color:#a78bfa; }
     #voice-pill.transcribing { display:inline; background:#1f2937; color:#9ca3af; }
     #voice-pill.speaking     { display:inline; background:#431407; color:#fb923c; }
@@ -313,6 +314,98 @@
     #model-select:focus { outline: none; border-color: var(--accent); }
     #model-select option { background: #1a1a1a; }
 
+    /* ── Settings overlay ── */
+    #settings-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    #settings-overlay.visible { display: flex; }
+    #settings-dialog {
+      background: #1a1a1a;
+      border: 1px solid #2a2a2a;
+      border-radius: 12px;
+      padding: 24px 28px;
+      width: 360px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    #settings-dialog h3 { font-size: .95rem; font-weight: 600; margin: 0; }
+    .settings-field { display: flex; flex-direction: column; gap: 6px; }
+    .settings-field label { font-size: .78rem; color: var(--text-muted); }
+    .settings-field .key-hint { font-size: .72rem; color: #4b5563; }
+    .settings-input-row { display: flex; gap: 6px; }
+    .settings-input-row input {
+      flex: 1;
+      background: #111;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: .85rem;
+      padding: 8px 12px;
+      outline: none;
+      font-family: "SF Mono", "Consolas", monospace;
+    }
+    .settings-input-row input:focus { border-color: var(--accent); }
+    .settings-input-row input::placeholder { color: #4b5563; font-family: inherit; }
+    .btn-show-key {
+      background: #1f2937; color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 0 10px; font-size: .72rem; cursor: pointer; flex-shrink: 0;
+    }
+    .btn-show-key:hover { background: #374151; color: var(--text); }
+    .settings-note { font-size: .75rem; color: #4b5563; line-height: 1.5; }
+    .settings-btns { display: flex; gap: 8px; margin-top: 4px; }
+    .settings-btns button {
+      flex: 1; padding: 9px 0; border-radius: 8px;
+      font-size: .85rem; font-weight: 600; cursor: pointer; border: none;
+    }
+    #settings-save-btn { background: var(--accent); color: #fff; }
+    #settings-save-btn:hover:not(:disabled) { background: #2563eb; }
+    #settings-save-btn:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+    #settings-cancel-btn { background: #1f2937; color: var(--text-muted); border: 1px solid var(--border) !important; }
+    #settings-cancel-btn:hover { background: #374151; }
+    #settings-btn {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 3px 8px; font-size: .82rem; cursor: pointer;
+    }
+    #settings-btn:hover { background: #1a1a1a; color: var(--text); }
+
+    /* ── Update banner ── */
+    #update-banner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 20px;
+      font-size: .8rem;
+      flex-shrink: 0;
+    }
+    #update-banner.downloading {
+      display: flex;
+      background: #1c2330;
+      color: #6b7280;
+      border-bottom: 1px solid var(--border);
+    }
+    #update-banner.ready {
+      display: flex;
+      background: #1a2e1a;
+      color: #4ade80;
+      border-bottom: 1px solid #166534;
+    }
+    #update-banner span { flex: 1; }
+    #update-install-btn {
+      background: #16a34a; color: #fff;
+      border: none; border-radius: 6px;
+      padding: 4px 14px; font-size: .78rem;
+      font-weight: 600; cursor: pointer;
+    }
+    #update-install-btn:hover { background: #15803d; }
+
     .win-controls { margin-left:auto; display:flex; gap:4px; -webkit-app-region:no-drag; }
     .win-controls button {
       width:28px; height:22px; border:none; border-radius:4px;
@@ -330,6 +423,12 @@
   <span id="ws-status">connecting…</span>
 </header>
 
+<!-- Update banner — hidden until auto-updater fires -->
+<div id="update-banner">
+  <span id="update-msg">Downloading update…</span>
+  <button id="update-install-btn" style="display:none">Restart to update</button>
+</div>
+
 <div id="top-bar">
   <div class="status-dot" id="status-dot"></div>
   <span id="status-label">Stopped</span>
@@ -339,6 +438,7 @@
   <button id="interrupt-btn"   style="display:none">⏹ Interrupt</button>
   <button id="clear-chat-btn" title="Clear conversation history">🗑 Clear</button>
   <button id="debug-btn" title="Toggle audio debug panel">Debug</button>
+  <button id="settings-btn" title="Settings">⚙</button>
   <select id="model-select" title="Active model">
     <option disabled selected>Loading models…</option>
   </select>
@@ -362,6 +462,32 @@
 <div id="input-bar">
   <textarea id="msg-input" rows="1" placeholder="Message Charles…"></textarea>
   <button id="send-btn">Send</button>
+</div>
+
+<!-- Settings dialog -->
+<div id="settings-overlay">
+  <div id="settings-dialog">
+    <h3>Settings</h3>
+    <div class="settings-field">
+      <label for="settings-openrouter-key">OpenRouter API Key <span style="color:#ef4444">*</span></label>
+      <div class="settings-input-row">
+        <input id="settings-openrouter-key" type="password" placeholder="sk-or-v1-…" autocomplete="off" spellcheck="false" />
+        <button class="btn-show-key" data-target="settings-openrouter-key">Show</button>
+      </div>
+    </div>
+    <div class="settings-field">
+      <label for="settings-virustotal-key">VirusTotal API Key <span class="key-hint">(optional)</span></label>
+      <div class="settings-input-row">
+        <input id="settings-virustotal-key" type="password" placeholder="Leave blank to remove" autocomplete="off" spellcheck="false" />
+        <button class="btn-show-key" data-target="settings-virustotal-key">Show</button>
+      </div>
+    </div>
+    <p class="settings-note">Saving will restart the Charles API to apply new keys.</p>
+    <div class="settings-btns">
+      <button id="settings-cancel-btn">Cancel</button>
+      <button id="settings-save-btn">Save &amp; Restart</button>
+    </div>
+  </div>
 </div>
 
 <!-- Close dialog -->
@@ -651,10 +777,11 @@ function setStatus(state, message) {
 function setVoiceState(state) {
   const DOTS = '<span class="wave-dots"><span></span><span></span><span></span></span>';
   const labels = {
-    standby:      '💤 Say "Hey Charles"',
-    listening:    `🎙 Listening ${DOTS}`,
-    transcribing: `🎙 Listening ${DOTS}`,
-    speaking:     `🔊 Speaking ${DOTS}`,
+    loading:      `Warming up ${DOTS}`,
+    standby:      'Say "Hey Charles"',
+    listening:    `Listening ${DOTS}`,
+    transcribing: `Listening ${DOTS}`,
+    speaking:     `Speaking ${DOTS}`,
     error:        'Voice offline',
   };
   $voicePill.className = state;
@@ -750,6 +877,56 @@ document.getElementById('close-btn-quit').addEventListener('click', () => {
   window.electronAPI.quitApp();
 });
 
+// ── Settings dialog ───────────────────────────────────────────────────────────
+const $settingsOverlay   = document.getElementById('settings-overlay');
+const $settingsSaveBtn   = document.getElementById('settings-save-btn');
+const $settingsCancelBtn = document.getElementById('settings-cancel-btn');
+const $orKey             = document.getElementById('settings-openrouter-key');
+const $vtKey             = document.getElementById('settings-virustotal-key');
+
+document.getElementById('settings-btn').addEventListener('click', async () => {
+  const keys = await window.electronAPI.getApiKeys();
+  $orKey.value = keys.openrouterKey;
+  $vtKey.value = keys.virustotalKey;
+  $settingsOverlay.classList.add('visible');
+  $orKey.focus();
+});
+
+$settingsOverlay.addEventListener('click', (e) => {
+  if (e.target === $settingsOverlay) $settingsOverlay.classList.remove('visible');
+});
+
+$settingsCancelBtn.addEventListener('click', () => {
+  $settingsOverlay.classList.remove('visible');
+});
+
+$settingsSaveBtn.addEventListener('click', async () => {
+  const openrouterKey = $orKey.value.trim();
+  if (!openrouterKey) { $orKey.focus(); return; }
+  $settingsSaveBtn.disabled = true;
+  $settingsSaveBtn.textContent = 'Restarting…';
+  try {
+    await window.electronAPI.saveApiKeys({
+      openrouterKey,
+      virustotalKey: $vtKey.value.trim(),
+    });
+    $settingsOverlay.classList.remove('visible');
+  } finally {
+    $settingsSaveBtn.disabled = false;
+    $settingsSaveBtn.textContent = 'Save & Restart';
+  }
+});
+
+// Show/hide toggles for key inputs
+document.querySelectorAll('.btn-show-key').forEach((btn) => {
+  btn.addEventListener('click', () => {
+    const input = document.getElementById(btn.dataset.target);
+    const showing = input.type === 'text';
+    input.type = showing ? 'password' : 'text';
+    btn.textContent = showing ? 'Show' : 'Hide';
+  });
+});
+
 // ── Audio debug panel ─────────────────────────────────────────────────────────
 const $debugPanel  = document.getElementById('debug-panel');
 const $debugBtn    = document.getElementById('debug-btn');
@@ -821,6 +998,26 @@ const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => 
 });
 const cleanupVoice      = window.electronAPI.onVoiceState(({ state }) => setVoiceState(state));
 const cleanupTranscript = window.electronAPI.onVoiceTranscript(({ text }) => showVoiceTranscript(text));
+
+// ── Auto-update banner ────────────────────────────────────────────────────────
+const $updateBanner  = document.getElementById('update-banner');
+const $updateMsg     = document.getElementById('update-msg');
+const $updateInstall = document.getElementById('update-install-btn');
+
+window.electronAPI.onUpdateStatus(({ state }) => {
+  if (state === 'downloading') {
+    $updateBanner.className = 'downloading';
+    $updateMsg.textContent  = 'Downloading update…';
+    $updateInstall.style.display = 'none';
+  } else if (state === 'ready') {
+    $updateBanner.className = 'ready';
+    $updateMsg.textContent  = 'Update ready';
+    $updateInstall.style.display = 'inline';
+  }
+});
+
+$updateInstall.addEventListener('click', () => window.electronAPI.installUpdate());
+
 window.addEventListener('beforeunload', () => { cleanupStatus(); cleanupVoice(); cleanupTranscript(); cleanupDebug(); });
 
 // Initial state — API is auto-starting in the background
