@@ -21,6 +21,12 @@ const { spawn } = require('child_process')
 const projectRoot = path.join(__dirname, '..')
 const setupFlagPath = path.join(app.getPath('userData'), 'setup_complete')
 
+// Use bundled Python 3.11 in the packaged app; system Python in dev.
+const isPacked  = app.isPackaged
+const pythonExe = isPacked
+  ? path.join(process.resourcesPath, 'python', 'python.exe')
+  : 'python'
+
 // ── Window ────────────────────────────────────────────────────────────────────
 
 let wizardWindow = null
@@ -46,8 +52,14 @@ function createWizardWindow({ onComplete }) {
 function _registerHandlers(onComplete) {
 
   // ── Step 1: Python check ──────────────────────────────────────────────────
+  // When packaged, we ship bundled Python 3.11 — no system Python needed.
+  // In dev mode, validate the system Python version as before.
   ipcMain.handle('wizard:check-python', () => new Promise((resolve) => {
-    const proc = spawn('python', ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] })
+    if (isPacked) {
+      // Bundled Python is always 3.11 — skip validation
+      return resolve({ ok: true, version: '3.11 (bundled)' })
+    }
+    const proc = spawn(pythonExe, ['--version'], { stdio: ['ignore', 'pipe', 'pipe'] })
     let out = ''
     proc.stdout.on('data', d => { out += d })
     proc.stderr.on('data', d => { out += d })
@@ -77,7 +89,7 @@ function _registerHandlers(onComplete) {
 
     const runPip = (label, reqFile) => new Promise((resolve, reject) => {
       send(`\n▶  ${label}\n`)
-      const proc = spawn('python', ['-m', 'pip', 'install', '-r', reqFile, '--progress-bar', 'off'], {
+      const proc = spawn(pythonExe, ['-m', 'pip', 'install', '-r', reqFile, '--progress-bar', 'off'], {
         stdio: ['ignore', 'pipe', 'pipe'],
       })
       proc.stdout.on('data', d => send(d.toString()))
@@ -100,7 +112,8 @@ function _registerHandlers(onComplete) {
 
   // ── Step 3b: save keys to .env ───────────────────────────────────────────
   ipcMain.handle('wizard:save-keys', (_, { openrouterKey, virustotalKey }) => {
-    const envPath = path.join(projectRoot, '.env')
+    // Write .env to userData (writable in both dev and packaged app)
+    const envPath = path.join(app.getPath('userData'), '.env')
     let content = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : ''
 
     const upsert = (src, key, value) => {

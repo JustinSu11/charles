@@ -244,6 +244,7 @@
 
     #voice-pill { font-size:.72rem; padding:2px 8px; border-radius:999px; display:none; }
     #voice-pill.standby      { display:inline; background:#1c2330; color:#6b7280; }
+    #voice-pill.loading      { display:inline; background:#1c2330; color:#6b7280; }
     #voice-pill.listening    { display:inline; background:#2e1065; color:#a78bfa; }
     #voice-pill.transcribing { display:inline; background:#1f2937; color:#9ca3af; }
     #voice-pill.speaking     { display:inline; background:#431407; color:#fb923c; }
@@ -375,6 +376,36 @@
     }
     #settings-btn:hover { background: #1a1a1a; color: var(--text); }
 
+    /* ── Update banner ── */
+    #update-banner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 20px;
+      font-size: .8rem;
+      flex-shrink: 0;
+    }
+    #update-banner.downloading {
+      display: flex;
+      background: #1c2330;
+      color: #6b7280;
+      border-bottom: 1px solid var(--border);
+    }
+    #update-banner.ready {
+      display: flex;
+      background: #1a2e1a;
+      color: #4ade80;
+      border-bottom: 1px solid #166534;
+    }
+    #update-banner span { flex: 1; }
+    #update-install-btn {
+      background: #16a34a; color: #fff;
+      border: none; border-radius: 6px;
+      padding: 4px 14px; font-size: .78rem;
+      font-weight: 600; cursor: pointer;
+    }
+    #update-install-btn:hover { background: #15803d; }
+
     .win-controls { margin-left:auto; display:flex; gap:4px; -webkit-app-region:no-drag; }
     .win-controls button {
       width:28px; height:22px; border:none; border-radius:4px;
@@ -391,6 +422,12 @@
   <h1>Charles</h1>
   <span id="ws-status">connecting…</span>
 </header>
+
+<!-- Update banner — hidden until auto-updater fires -->
+<div id="update-banner">
+  <span id="update-msg">Downloading update…</span>
+  <button id="update-install-btn" style="display:none">Restart to update</button>
+</div>
 
 <div id="top-bar">
   <div class="status-dot" id="status-dot"></div>
@@ -731,10 +768,11 @@ function setStatus(state, message) {
 function setVoiceState(state) {
   const DOTS = '<span class="wave-dots"><span></span><span></span><span></span></span>';
   const labels = {
-    standby:      '💤 Say "Hey Charles"',
-    listening:    `🎙 Listening ${DOTS}`,
-    transcribing: `🎙 Listening ${DOTS}`,
-    speaking:     `🔊 Speaking ${DOTS}`,
+    loading:      `Warming up ${DOTS}`,
+    standby:      'Say "Hey Charles"',
+    listening:    `Listening ${DOTS}`,
+    transcribing: `Listening ${DOTS}`,
+    speaking:     `Speaking ${DOTS}`,
     error:        'Voice offline',
   };
   $voicePill.className = state;
@@ -951,6 +989,26 @@ const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => 
 });
 const cleanupVoice      = window.electronAPI.onVoiceState(({ state }) => setVoiceState(state));
 const cleanupTranscript = window.electronAPI.onVoiceTranscript(({ text }) => showVoiceTranscript(text));
+
+// ── Auto-update banner ────────────────────────────────────────────────────────
+const $updateBanner  = document.getElementById('update-banner');
+const $updateMsg     = document.getElementById('update-msg');
+const $updateInstall = document.getElementById('update-install-btn');
+
+window.electronAPI.onUpdateStatus(({ state }) => {
+  if (state === 'downloading') {
+    $updateBanner.className = 'downloading';
+    $updateMsg.textContent  = 'Downloading update…';
+    $updateInstall.style.display = 'none';
+  } else if (state === 'ready') {
+    $updateBanner.className = 'ready';
+    $updateMsg.textContent  = 'Update ready';
+    $updateInstall.style.display = 'inline';
+  }
+});
+
+$updateInstall.addEventListener('click', () => window.electronAPI.installUpdate());
+
 window.addEventListener('beforeunload', () => { cleanupStatus(); cleanupVoice(); cleanupTranscript(); cleanupDebug(); });
 
 // Initial state — API is auto-starting in the background

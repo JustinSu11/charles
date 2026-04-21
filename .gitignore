@@ -175,6 +175,10 @@ voice/bin/*
 
 # Whisper model cache lives in ~/.cache/whisper (outside the repo)
 
+# ── Bundled embedded Python (downloaded by scripts/setup-embedded-python.ps1) ─
+# Large binary blob — not tracked in git. Run the setup script before npm run dist.
+resources/python/
+
 # ── Tool / IDE metadata — never commit ───────────────────────────────────────
 .superpowers/
 .claude/
