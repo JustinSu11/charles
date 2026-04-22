@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   },
   getApiKeys:   () => ipcRenderer.invoke('settings:get-keys'),
   saveApiKeys:  (keys) => ipcRenderer.invoke('settings:save-keys', keys),
+  getPrefs:     () => ipcRenderer.invoke('settings:get-prefs'),
+  savePrefs:    (p)    => ipcRenderer.invoke('settings:save-prefs', p),
   installUpdate: () => ipcRenderer.invoke('install-update'),
   onUpdateStatus: (cb) => {
     const listener = (_e, d) => cb(d)

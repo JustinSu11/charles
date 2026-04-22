@@ -167,6 +167,7 @@ def _one_turn(
 
     # Emit transcript immediately so the GUI can show it before the API responds
     print(f"VOICE_TRANSCRIPT:{text}", flush=True)
+    print("VOICE_STATE:THINKING", flush=True)  # waiting for API response
 
     # Start a soft repeating hum so the user knows Charles is working.
     # Runs until the API responds — then we stop it before TTS starts.

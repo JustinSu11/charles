@@ -247,6 +247,7 @@
     #voice-pill.loading      { display:inline; background:#1c2330; color:#6b7280; }
     #voice-pill.listening    { display:inline; background:#2e1065; color:#a78bfa; }
     #voice-pill.transcribing { display:inline; background:#1f2937; color:#9ca3af; }
+    #voice-pill.thinking     { display:inline; background:#1e3a5f; color:#60a5fa; }
     #voice-pill.speaking     { display:inline; background:#431407; color:#fb923c; }
     #voice-pill.error        { display:inline; background:#1f2937; color:#9ca3af; }
 
@@ -261,18 +262,7 @@
     #clear-chat-btn:hover { background:#1f2937; color:#9ca3af; }
     #msg-input:disabled { opacity:.4; cursor:not-allowed; }
 
-    /* ── Audio debug panel ── */
-    #debug-panel {
-      display: none;
-      padding: 8px 16px;
-      border-bottom: 1px solid var(--border);
-      background: #0a0a0a;
-      font-family: "Consolas", monospace;
-      font-size: .72rem;
-      color: var(--text-muted);
-      flex-shrink: 0;
-    }
-    #debug-panel.visible { display: block; }
+    /* ── Debug bar shared styles (used inside dev panel) ── */
     .debug-row {
       display: flex; align-items: center; gap: 8px;
       margin-bottom: 4px;
@@ -292,13 +282,88 @@
     .debug-bar-fill.warn  { background: #f59e0b; }
     .debug-bar-fill.hit   { background: #a78bfa; }
     .debug-value { width: 40px; text-align: right; flex-shrink: 0; }
-    #debug-btn {
-      background: transparent; color: var(--text-muted);
-      border: 1px solid var(--border); border-radius: 6px;
-      padding: 3px 10px; font-size: .72rem; cursor: pointer;
+
+    /* ── Main content area (chat + dev panel side by side) ── */
+    #main-content {
+      flex: 1; display: flex; flex-direction: row; overflow: hidden;
     }
-    #debug-btn.active { border-color: #3b82f6; color: #3b82f6; }
-    #debug-btn:hover  { background: #1a1a1a; }
+    #chat-area {
+      flex: 1; display: flex; flex-direction: column; overflow: hidden;
+    }
+
+    /* ── Developer side panel ── */
+    #dev-panel {
+      display: none; flex-direction: column;
+      width: 280px; flex-shrink: 0;
+      background: #080808;
+      border-left: 1px solid var(--border);
+      font-family: "Consolas", monospace;
+      font-size: .72rem;
+      color: var(--text-muted);
+      overflow: hidden;
+    }
+    #dev-panel.visible { display: flex; }
+    .dev-panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      font-size: .75rem; font-weight: 600;
+      color: var(--text); flex-shrink: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    #dev-panel-close {
+      background: transparent; border: none;
+      color: var(--text-muted); font-size: .8rem;
+      cursor: pointer; padding: 2px 5px; border-radius: 4px;
+    }
+    #dev-panel-close:hover { background: #1a1a1a; color: var(--text); }
+    .dev-section-label {
+      padding: 6px 12px 3px;
+      font-size: .65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .08em;
+      color: #444; flex-shrink: 0;
+    }
+    #debug-panel-inner {
+      padding: 4px 12px 8px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #dev-log {
+      flex: 1; overflow-y: auto;
+      padding: 4px 0;
+    }
+    #dev-log::-webkit-scrollbar { width: 4px; }
+    #dev-log::-webkit-scrollbar-track { background: transparent; }
+    #dev-log::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    .dev-log-entry {
+      padding: 1px 12px;
+      line-height: 1.6;
+      display: flex; gap: 5px;
+    }
+    .dev-log-time   { color: #2a2a2a; flex-shrink: 0; }
+    .dev-log-source { flex-shrink: 0; }
+    .dev-log-msg    { flex: 1; word-break: break-all; }
+    .dev-log-entry.voice      .dev-log-source { color: #4b5563; }
+    .dev-log-entry.api        .dev-log-source { color: #3b82f6; }
+    .dev-log-entry.api        .dev-log-msg    { color: #60a5fa; }
+    .dev-log-entry.transcript .dev-log-source { color: #7c3aed; }
+    .dev-log-entry.transcript .dev-log-msg    { color: #a78bfa; font-style: italic; }
+    .dev-log-entry.thinking   .dev-log-source { color: #2563eb; }
+    .dev-log-entry.thinking   .dev-log-msg    { color: #60a5fa; }
+    .dev-log-entry.error      .dev-log-source { color: #b91c1c; }
+    .dev-log-entry.error      .dev-log-msg    { color: #f87171; }
+
+    /* ── Settings developer mode toggle ── */
+    .settings-toggle-row {
+      flex-direction: row !important;
+      align-items: center !important;
+      justify-content: space-between;
+      padding: 2px 0;
+    }
+    .settings-toggle-row label { margin: 0; font-size: .82rem; color: var(--text-muted); cursor: pointer; }
+    .settings-toggle-row input[type="checkbox"] {
+      width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer;
+    }
 
     #model-select {
       background: var(--surface);
@@ -437,7 +502,6 @@
   <button id="stop-btn"      style="display:none">Stop</button>
   <button id="interrupt-btn"   style="display:none">⏹ Interrupt</button>
   <button id="clear-chat-btn" title="Clear conversation history">🗑 Clear</button>
-  <button id="debug-btn" title="Toggle audio debug panel">Debug</button>
   <button id="settings-btn" title="Settings">⚙</button>
   <select id="model-select" title="Active model">
     <option disabled selected>Loading models…</option>
@@ -448,20 +512,32 @@
   </div>
 </div>
 
-<div id="debug-panel">
-  <div class="debug-row" id="debug-row-rms">
-    <span class="debug-label">Mic level</span>
-    <div class="debug-bar-track"><div class="debug-bar-fill rms" id="debug-fill-rms"></div></div>
-    <span class="debug-value" id="debug-val-rms">—</span>
+<div id="main-content">
+  <div id="chat-area">
+    <div id="messages"></div>
+    <div id="input-bar">
+      <textarea id="msg-input" rows="1" placeholder="Message Charles…"></textarea>
+      <button id="send-btn">Send</button>
+    </div>
   </div>
-  <!-- model score rows injected by JS -->
-</div>
 
-<div id="messages"></div>
-
-<div id="input-bar">
-  <textarea id="msg-input" rows="1" placeholder="Message Charles…"></textarea>
-  <button id="send-btn">Send</button>
+  <div id="dev-panel">
+    <div class="dev-panel-header">
+      <span>Developer</span>
+      <button id="dev-panel-close" title="Close panel">✕</button>
+    </div>
+    <div class="dev-section-label">Audio</div>
+    <div id="debug-panel-inner">
+      <div class="debug-row" id="debug-row-rms">
+        <span class="debug-label">Mic level</span>
+        <div class="debug-bar-track"><div class="debug-bar-fill rms" id="debug-fill-rms"></div></div>
+        <span class="debug-value" id="debug-val-rms">—</span>
+      </div>
+      <!-- model score rows injected by JS -->
+    </div>
+    <div class="dev-section-label">Event Log</div>
+    <div id="dev-log"></div>
+  </div>
 </div>
 
 <!-- Settings dialog -->
@@ -481,6 +557,10 @@
         <input id="settings-virustotal-key" type="password" placeholder="Leave blank to remove" autocomplete="off" spellcheck="false" />
         <button class="btn-show-key" data-target="settings-virustotal-key">Show</button>
       </div>
+    </div>
+    <div class="settings-field settings-toggle-row">
+      <label for="settings-dev-mode">Developer Mode</label>
+      <input type="checkbox" id="settings-dev-mode" />
     </div>
     <p class="settings-note">Saving will restart the Charles API to apply new keys.</p>
     <div class="settings-btns">
@@ -781,6 +861,7 @@ function setVoiceState(state) {
     standby:      'Say "Hey Charles"',
     listening:    `Listening ${DOTS}`,
     transcribing: `Listening ${DOTS}`,
+    thinking:     `Thinking ${DOTS}`,
     speaking:     `Speaking ${DOTS}`,
     error:        'Voice offline',
   };
@@ -885,9 +966,13 @@ const $orKey             = document.getElementById('settings-openrouter-key');
 const $vtKey             = document.getElementById('settings-virustotal-key');
 
 document.getElementById('settings-btn').addEventListener('click', async () => {
-  const keys = await window.electronAPI.getApiKeys();
+  const [keys, prefs] = await Promise.all([
+    window.electronAPI.getApiKeys(),
+    window.electronAPI.getPrefs(),
+  ]);
   $orKey.value = keys.openrouterKey;
   $vtKey.value = keys.virustotalKey;
+  document.getElementById('settings-dev-mode').checked = !!prefs.developerMode;
   $settingsOverlay.classList.add('visible');
   $orKey.focus();
 });
@@ -906,10 +991,17 @@ $settingsSaveBtn.addEventListener('click', async () => {
   $settingsSaveBtn.disabled = true;
   $settingsSaveBtn.textContent = 'Restarting…';
   try {
-    await window.electronAPI.saveApiKeys({
-      openrouterKey,
-      virustotalKey: $vtKey.value.trim(),
-    });
+    const newDevMode = document.getElementById('settings-dev-mode').checked;
+    await Promise.all([
+      window.electronAPI.saveApiKeys({
+        openrouterKey,
+        virustotalKey: $vtKey.value.trim(),
+      }),
+      window.electronAPI.savePrefs({ developerMode: newDevMode }),
+    ]);
+    // Apply dev panel visibility immediately
+    devPanelVisible = newDevMode;
+    document.getElementById('dev-panel').classList.toggle('visible', devPanelVisible);
     $settingsOverlay.classList.remove('visible');
   } finally {
     $settingsSaveBtn.disabled = false;
@@ -927,18 +1019,50 @@ document.querySelectorAll('.btn-show-key').forEach((btn) => {
   });
 });
 
-// ── Audio debug panel ─────────────────────────────────────────────────────────
-const $debugPanel  = document.getElementById('debug-panel');
-const $debugBtn    = document.getElementById('debug-btn');
-const $debugFillRms = document.getElementById('debug-fill-rms');
-const $debugValRms  = document.getElementById('debug-val-rms');
-let debugVisible = false;
-const _debugModelRows = {};   // modelName → { fill, val } DOM refs
+// ── Developer panel ───────────────────────────────────────────────────────────
+const $devPanel        = document.getElementById('dev-panel');
+const $devLog          = document.getElementById('dev-log');
+const $debugPanelInner = document.getElementById('debug-panel-inner');
+const $debugFillRms    = document.getElementById('debug-fill-rms');
+const $debugValRms     = document.getElementById('debug-val-rms');
+const _debugModelRows  = {};
+let devPanelVisible    = false;
 
-$debugBtn.addEventListener('click', () => {
-  debugVisible = !debugVisible;
-  $debugPanel.classList.toggle('visible', debugVisible);
-  $debugBtn.classList.toggle('active', debugVisible);
+async function loadDevPanelState() {
+  try {
+    const prefs = await window.electronAPI.getPrefs();
+    devPanelVisible = !!prefs.developerMode;
+    $devPanel.classList.toggle('visible', devPanelVisible);
+  } catch {}
+}
+
+function addLogEntry(source, message, type) {
+  const entryType = type || 'voice';
+  const ts = new Date().toTimeString().slice(0, 8);
+  const entry = document.createElement('div');
+  entry.className = 'dev-log-entry ' + entryType;
+  const timeSpan   = document.createElement('span');
+  timeSpan.className = 'dev-log-time';
+  timeSpan.textContent = ts;
+  const sourceSpan = document.createElement('span');
+  sourceSpan.className = 'dev-log-source';
+  sourceSpan.textContent = '[' + source + ']';
+  const msgSpan    = document.createElement('span');
+  msgSpan.className = 'dev-log-msg';
+  msgSpan.textContent = message;
+  entry.appendChild(timeSpan);
+  entry.appendChild(sourceSpan);
+  entry.appendChild(msgSpan);
+  $devLog.insertBefore(entry, $devLog.firstChild);
+  // Cap at 200 entries to prevent unbounded memory growth
+  while ($devLog.children.length > 200) { $devLog.removeChild($devLog.lastChild); }
+}
+
+document.getElementById('dev-panel-close').addEventListener('click', async () => {
+  devPanelVisible = false;
+  $devPanel.classList.remove('visible');
+  document.getElementById('settings-dev-mode').checked = false;
+  await window.electronAPI.savePrefs({ developerMode: false });
 });
 
 function _getOrCreateModelRow(name) {
@@ -959,13 +1083,13 @@ function _getOrCreateModelRow(name) {
   row.appendChild(label);
   row.appendChild(track);
   row.appendChild(val);
-  $debugPanel.appendChild(row);
+  $debugPanelInner.appendChild(row);
   _debugModelRows[name] = { fill, val };
   return _debugModelRows[name];
 }
 
 const cleanupDebug = window.electronAPI.onVoiceDebug((payload) => {
-  if (!debugVisible) return;
+  if (!devPanelVisible) return;
   const { rms, ...modelScores } = payload;
 
   // Mic level bar (RMS normalised 0–1, displayed as %)
@@ -986,6 +1110,9 @@ const cleanupDebug = window.electronAPI.onVoiceDebug((payload) => {
   }
 });
 
+// Load dev panel state on startup
+loadDevPanelState();
+
 const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => {
   setStatus(state, message);
   // Connect WebSocket the first time the API becomes ready
@@ -995,9 +1122,20 @@ const cleanupStatus = window.electronAPI.onStatusUpdate(({ state, message }) => 
     }
     initModelSelector();
   }
+  // Log to dev panel
+  if      (state === 'error')        addLogEntry('api', message || 'Error', 'error');
+  else if (state === 'initializing') addLogEntry('api', 'Starting…', 'api');
+  else if (state === 'ready')        addLogEntry('api', 'Ready', 'api');
 });
-const cleanupVoice      = window.electronAPI.onVoiceState(({ state }) => setVoiceState(state));
-const cleanupTranscript = window.electronAPI.onVoiceTranscript(({ text }) => showVoiceTranscript(text));
+const cleanupVoice = window.electronAPI.onVoiceState(({ state }) => {
+  setVoiceState(state);
+  const type = state === 'thinking' ? 'thinking' : state === 'error' ? 'error' : 'voice';
+  addLogEntry('voice', state, type);
+});
+const cleanupTranscript = window.electronAPI.onVoiceTranscript(({ text }) => {
+  showVoiceTranscript(text);
+  addLogEntry('transcript', '"' + text + '"', 'transcript');
+});
 
 // ── Auto-update banner ────────────────────────────────────────────────────────
 const $updateBanner  = document.getElementById('update-banner');

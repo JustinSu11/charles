@@ -302,6 +302,19 @@ function registerIPC() {
     await startApi()
     return { ok: true }
   })
+
+  // UI preferences (developer mode, etc.) — stored separately from API keys
+  const settingsPath = path.join(app.getPath('userData'), 'settings.json')
+
+  ipcMain.handle('settings:get-prefs', () => {
+    try { return JSON.parse(fs.readFileSync(settingsPath, 'utf8')) }
+    catch { return { developerMode: false } }
+  })
+
+  ipcMain.handle('settings:save-prefs', (_, prefs) => {
+    fs.writeFileSync(settingsPath, JSON.stringify(prefs, null, 2), 'utf8')
+    return { ok: true }
+  })
 }
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
