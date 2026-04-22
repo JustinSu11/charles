@@ -11,27 +11,27 @@
 <style>
 /* ─────────────── Variables ─────────────── */
 :root {
-  --bg:          #f8f7f2;
-  --surface:     #ffffff;
-  --surface2:    #f1f0ea;
-  --border:      #e0dfd7;
-  --border2:     #c8c6bc;
-  --accent:      #1d4ed8;
-  --accent-glow: rgba(29,78,216,0.14);
-  --accent-dim:  rgba(29,78,216,0.07);
-  --text:        #1a1916;
-  --text-muted:  #706e66;
-  --text-dim:    #ccc9be;
+  --bg:          #5c1e0e;
+  --surface:     #8c3318;
+  --surface2:    #4a1508;
+  --border:      #6b2010;
+  --border2:     #7c2812;
+  --accent:      #84cc16;
+  --accent-glow: rgba(132,204,22,0.2);
+  --accent-dim:  rgba(132,204,22,0.07);
+  --text:        #fef3c7;
+  --text-muted:  #fef3c7;
+  --text-dim:    rgba(254,243,199,0.35);
   --font-d:      'Bebas Neue', sans-serif;
   --font-b:      'Space Mono', monospace;
 }
 
 /* ─────────────── Reset ─────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; background: radial-gradient(ellipse at 25% 45%, #8c3a18 0%, #5c1e0e 45%, #280a04 100%) fixed; background-attachment: fixed; }
 body {
   font-family: var(--font-b);
-  background: var(--bg);
+  background: transparent;
   color: var(--text);
   overflow-x: hidden;
   min-height: 100vh;
@@ -48,9 +48,9 @@ body {
 /* ─────────────── Nav ─────────────── */
 nav {
   position: fixed; top:0; left:0; right:0; z-index:500;
-  background: rgba(248,247,242,0.92);
+  background: rgba(92,30,14,0.25);
   backdrop-filter: blur(20px) saturate(150%);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(254,243,199,0.12);
   height: 56px;
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 48px;
@@ -77,9 +77,10 @@ nav {
   font-family: var(--font-b);
   font-size: 10px; font-weight:700;
   text-transform: uppercase; letter-spacing: 0.12em;
-  color: #fff; background: var(--accent);
+  color: #1c0f00; background: var(--accent);
   border: none; padding: 9px 22px;
   cursor: pointer; transition: all 0.15s; margin-left: 8px;
+  box-shadow: -3px 3px 8px rgba(0,0,0,0.35), -1px 2px 3px rgba(0,0,0,0.2);
 }
 .nav-cta:hover { opacity: 0.85; transform: translateY(-1px); }
 
@@ -87,10 +88,11 @@ nav {
 .btn-primary {
   font-family: var(--font-b); font-size: 11px; font-weight:700;
   text-transform: uppercase; letter-spacing: 0.1em;
-  color: #fff; background: var(--accent);
+  color: #1c0f00; background: var(--accent);
   border: none; padding: 14px 32px;
   cursor: pointer; transition: all 0.2s;
   display: flex; align-items:center; gap:8px;
+  box-shadow: -3px 3px 8px rgba(0,0,0,0.35), -1px 2px 3px rgba(0,0,0,0.2);
 }
 .btn-primary:hover {
   opacity:0.88; transform:translateY(-2px);
@@ -99,11 +101,12 @@ nav {
 .btn-ghost {
   font-family: var(--font-b); font-size: 11px; font-weight:700;
   text-transform: uppercase; letter-spacing: 0.1em;
-  color: var(--text-muted); background: transparent;
-  border: 1px solid var(--border); padding: 14px 32px;
+  color: #fef3c7; background: transparent;
+  border: 1px solid var(--accent); padding: 14px 32px;
   cursor: pointer; transition: all 0.15s;
+  box-shadow: -3px 3px 8px rgba(0,0,0,0.25), -1px 2px 3px rgba(0,0,0,0.15);
 }
-.btn-ghost:hover { border-color: var(--text-muted); color: var(--text); }
+.btn-ghost:hover { border-color: var(--accent); color: var(--text); }
 
 /* ─────────────── LANDING — Hero ─────────────── */
 .hero {
@@ -132,6 +135,7 @@ nav {
   font-size: clamp(72px, 10vw, 148px);
   line-height: 0.88; letter-spacing: 0.01em;
   color: var(--text); margin-bottom: 8px;
+  text-shadow: -8px 4px 0 #120401;
 }
 .hero-title .accent { color: var(--accent); }
 .cursor {
@@ -172,9 +176,7 @@ nav {
   width: 100%;
   display: block;
   border: 1px solid var(--border);
-  box-shadow:
-    0 32px 80px rgba(0,0,0,0.12),
-    0 8px 24px rgba(0,0,0,0.06);
+  box-shadow: -6px 6px 20px rgba(0,0,0,0.45), -2px 4px 8px rgba(0,0,0,0.3);
 }
 .hero-gif-label {
   display: flex; align-items: center; gap: 8px;
@@ -209,7 +211,7 @@ nav {
 
 .feat-grid {
   display: grid; grid-template-columns: repeat(3,1fr);
-  border: 1px solid var(--border);
+  border: none;
 }
 
 /* ── The lifted card effect ── */
@@ -335,10 +337,12 @@ footer {
 .dl-card-wrap { max-width: 1280px; margin: 0 48px; border: 1px solid var(--border); border-top: none; }
 .dl-card {
   padding: 48px;
-  background: var(--surface);
+  background: #7e2e13;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 48px; align-items: center;
+  border: none;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.4);
 }
 .dl-card-badge {
   display: inline-flex; align-items:center; gap:6px;
@@ -361,10 +365,11 @@ footer {
 .btn-download {
   font-family:var(--font-b); font-size:11px; font-weight:700;
   text-transform:uppercase; letter-spacing:0.1em;
-  color:#fff; background:var(--accent);
+  color:#1c0f00; background:var(--accent);
   border:none; padding:14px 28px;
   cursor:pointer; display:flex; align-items:center; gap:8px;
   transition: all 0.2s; width:fit-content;
+  box-shadow: -3px 3px 8px rgba(0,0,0,0.35), -1px 2px 3px rgba(0,0,0,0.2);
 }
 .btn-download:hover { opacity:0.85; transform:translateY(-2px); box-shadow:0 8px 24px var(--accent-glow); }
 
@@ -373,6 +378,7 @@ footer {
   display: grid; grid-template-columns:1fr 1fr;
   max-width:1280px; margin:0 48px;
   border: 1px solid var(--border); border-top:none;
+  background: #5c1e0e;
 }
 .dl-col { padding:40px; }
 .dl-col:first-child { border-right:1px solid var(--border); }
@@ -403,8 +409,8 @@ footer {
 .api-note {
   max-width:1280px; margin:0 48px 60px;
   padding:16px 20px;
-  background:var(--surface); border:1px solid var(--border);
-  border-top:none; border-left:3px solid var(--accent);
+  background:#7e2e13; border:none;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.4);
   font-size:11px; color:var(--text-muted); line-height:1.7;
 }
 .api-note a { color:var(--accent); text-decoration:none; }
