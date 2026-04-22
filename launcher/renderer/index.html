@@ -632,6 +632,7 @@ let conversationId      = null;   // set after first turn or history load
 let pendingTurn         = null;   // DOM node for the "thinking…" indicator
 let thinkingInterval    = null;   // setInterval ID for the animated dots
 let pendingVoiceWrapper = null;   // .turn wrapper rendered immediately on voice transcript
+let pendingTextWrapper  = null;   // .turn wrapper rendered immediately on text send
 let socket              = null;
 
 // ── DOM refs ──────────────────────────────────────────────────────────────────
@@ -772,12 +773,20 @@ function connectWebSocket(attempt = 0) {
     if (pendingVoiceWrapper && msg.interface === "voice") {
       // User bubble was already rendered by showVoiceTranscript — only add
       // the assistant bubble into the same wrapper to keep DOM structure intact.
-      // md() sanitizes via DOMPurify before setting innerHTML (same as renderTurn).
       const assistBubble = document.createElement("div");
       assistBubble.className = "bubble assistant from-voice";
-      assistBubble.innerHTML = md(msg.assistant.content); // md() = DOMPurify.sanitize(marked.parse(...))
+      assistBubble.innerHTML = md(msg.assistant.content);
       pendingVoiceWrapper.appendChild(assistBubble);
       pendingVoiceWrapper = null;
+      scrollToBottom();
+    } else if (pendingTextWrapper && msg.interface === "web") {
+      // User bubble was already rendered by sendMessage — only add the
+      // assistant bubble into the same wrapper to avoid double-rendering.
+      const assistBubble = document.createElement("div");
+      assistBubble.className = "bubble assistant";
+      assistBubble.innerHTML = md(msg.assistant.content);
+      pendingTextWrapper.appendChild(assistBubble);
+      pendingTextWrapper = null;
       scrollToBottom();
     } else {
       renderTurn(msg);
@@ -810,6 +819,19 @@ async function sendMessage() {
   $input.value = "";
   $input.style.height = "auto";
   $sendBtn.disabled = true;
+
+  // Render the user bubble immediately — don't wait for the WS broadcast.
+  // Store the wrapper so the WS handler can append the assistant bubble
+  // into it rather than calling renderTurn (which would double-render).
+  pendingTextWrapper = document.createElement("div");
+  pendingTextWrapper.className = "turn";
+  const userBubble = document.createElement("div");
+  userBubble.className = "bubble user";
+  userBubble.textContent = text;
+  pendingTextWrapper.appendChild(userBubble);
+  $messages.appendChild(pendingTextWrapper);
+  scrollToBottom();
+
   showThinking();
 
   const controller = new AbortController();
