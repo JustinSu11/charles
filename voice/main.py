@@ -359,7 +359,12 @@ def main() -> None:
         f"device {input_dev}" if input_dev is not None else "system default",
         f"device {output_dev}" if output_dev is not None else "system default",
     )
-    print("VOICE_STATE:STANDBY", flush=True)
+    # NOTE: STANDBY is NOT emitted here.  It is emitted by the on_ready callback
+    # below, which fires only once the OWW model is loaded AND the mic stream is
+    # actually open.  Emitting it here (before run_forever) caused a race: on
+    # second launch the pre-loaded model cache made startup fast, so users saw
+    # STANDBY and spoke immediately while OWW was still initialising — resulting
+    # in missed wake-word detections.
 
     # Listen for INTERRUPT commands from Electron via stdin (non-blocking thread)
     def _stdin_listener():
@@ -385,12 +390,18 @@ def main() -> None:
                 stop_event=stop_event,
             )
 
+    def _on_ready():
+        """Called by wake_word when the mic is open and detection has started."""
+        logger.info("Wake word engine ready — mic open, listening for wake word")
+        print("VOICE_STATE:STANDBY", flush=True)
+
     # Run the wake word loop (blocks until stop_event is set)
     try:
         wake_word.run_forever(
             on_wake=_on_wake,
             input_device_index=input_dev,
             stop_event=stop_event,
+            on_ready=_on_ready,
         )
     except EnvironmentError as exc:
         # Missing PICOVOICE_ACCESS_KEY
