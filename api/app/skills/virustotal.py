@@ -126,15 +126,18 @@ async def fetch(message: str = "") -> Optional[dict]:
     """
     Extract a hash or URL from *message* and look it up on VirusTotal.
 
-    Returns a result dict, or None if:
-    - No API key is configured
-    - No hash/URL found in the message (LLM will ask the user for one)
-    - The target is not found in VT (404)
+    Returns a result dict, or None if no hash/URL is found in the message.
+
+    When no API key is configured, returns a sentinel dict with
+    ``no_key=True`` so ``format()`` injects a hard factual "NO SCAN
+    PERFORMED" block.  This is stronger than returning None (instructions
+    only) because LLMs treat data-block statements as facts they must not
+    contradict — preventing them from hallucinating scan results from
+    training data.
     """
     if not _API_KEY:
-        # No key — return None so only INSTRUCTIONS are injected.
-        # The LLM will fall back to constructing a direct VT link for the user.
-        return None
+        target, kind = _extract_target(message)
+        return {"no_key": True, "target": target, "kind": kind}
 
     target, kind = _extract_target(message)
 
@@ -188,6 +191,29 @@ async def fetch(message: str = "") -> Optional[dict]:
 # ── Format ────────────────────────────────────────────────────────────────────
 
 def format(data: dict) -> str:
+    # No API key — produce a hard factual statement the LLM cannot contradict.
+    # Do NOT return instructions here; the INSTRUCTIONS block already handles
+    # the "what to tell the user" guidance.  This block provides the facts.
+    if data.get("no_key"):
+        target = data.get("target")
+        kind   = data.get("kind")
+        if target and kind == "hash":
+            link = f"https://www.virustotal.com/gui/file/{target}/detection"
+        elif target and kind == "url":
+            link = f"https://www.virustotal.com/gui/url-search?query={target}"
+        else:
+            link = "https://www.virustotal.com"
+        lines = [
+            "=== VirusTotal: NO SCAN PERFORMED ===",
+            "VIRUSTOTAL_API_KEY is not configured in Charles.",
+            "A real-time API call was NOT made. No scan data exists.",
+            "Do NOT present scan statistics, verdicts, or engine results.",
+        ]
+        if target:
+            lines.append(f"Target identified in message: {target}")
+        lines.append(f"Direct link for the user to check themselves: {link}")
+        return "\n".join(lines)
+
     if "error" in data:
         return f"VirusTotal lookup failed: {data['error']}"
 

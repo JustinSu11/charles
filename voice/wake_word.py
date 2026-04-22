@@ -122,6 +122,7 @@ def wait_for_wake_word(
     on_detected: Optional[Callable[[str], None]] = None,
     input_device_index: Optional[int] = None,
     stop_event=None,          # threading.Event — set it to exit the loop
+    on_ready: Optional[Callable[[], None]] = None,
 ) -> str:
     """
     Block until any configured wake word is detected, then return.
@@ -140,6 +141,11 @@ def wait_for_wake_word(
         Microphone device index.  None → system default.
     stop_event
         A ``threading.Event``.  When set, the loop exits without detection.
+    on_ready
+        Optional callback invoked once the microphone is open and the
+        detection loop is about to start.  Use this to emit STANDBY state
+        only when the service is genuinely ready to hear the wake word —
+        not before model loading and mic initialisation complete.
 
     Returns
     -------
@@ -164,6 +170,11 @@ def wait_for_wake_word(
     )
 
     with MicrophoneStream(input_device_index=input_device_index) as mic:
+        # Mic is open and OWW is loaded — signal to the caller that we are
+        # genuinely ready to detect the wake word now.
+        if on_ready is not None:
+            on_ready()
+
         while True:
             if stop_event is not None and stop_event.is_set():
                 logger.info("stop_event set — exiting wake word loop")
@@ -202,6 +213,7 @@ def run_forever(
     on_wake: Callable[[], None],
     input_device_index: Optional[int] = None,
     stop_event=None,
+    on_ready: Optional[Callable[[], None]] = None,
     model_path: Optional[Path] = None,  # kept for backward compat, ignored
 ) -> None:
     """
@@ -218,6 +230,10 @@ def run_forever(
         is paused while Charles is speaking or processing.
     stop_event
         Set to exit the loop cleanly between detections.
+    on_ready
+        Forwarded to ``wait_for_wake_word`` on every arm/re-arm cycle.
+        Called each time the mic is open and genuinely listening — including
+        after a conversation ends and detection re-arms.
     """
     models = _discover_models()
     if models:
@@ -233,6 +249,7 @@ def run_forever(
             wait_for_wake_word(
                 input_device_index=input_device_index,
                 stop_event=stop_event,
+                on_ready=on_ready,
             )
             if stop_event is not None and stop_event.is_set():
                 break
