@@ -562,7 +562,7 @@
       <label for="settings-dev-mode">Developer Mode</label>
       <input type="checkbox" id="settings-dev-mode" />
     </div>
-    <p class="settings-note">Saving will restart the Charles API to apply new keys.</p>
+    <p class="settings-note">Developer Mode applies instantly. Saving API keys will restart the Charles API.</p>
     <div class="settings-btns">
       <button id="settings-cancel-btn">Cancel</button>
       <button id="settings-save-btn">Save &amp; Restart</button>
@@ -991,17 +991,10 @@ $settingsSaveBtn.addEventListener('click', async () => {
   $settingsSaveBtn.disabled = true;
   $settingsSaveBtn.textContent = 'Restarting…';
   try {
-    const newDevMode = document.getElementById('settings-dev-mode').checked;
-    await Promise.all([
-      window.electronAPI.saveApiKeys({
-        openrouterKey,
-        virustotalKey: $vtKey.value.trim(),
-      }),
-      window.electronAPI.savePrefs({ developerMode: newDevMode }),
-    ]);
-    // Apply dev panel visibility immediately
-    devPanelVisible = newDevMode;
-    document.getElementById('dev-panel').classList.toggle('visible', devPanelVisible);
+    await window.electronAPI.saveApiKeys({
+      openrouterKey,
+      virustotalKey: $vtKey.value.trim(),
+    });
     $settingsOverlay.classList.remove('visible');
   } finally {
     $settingsSaveBtn.disabled = false;
@@ -1063,6 +1056,12 @@ document.getElementById('dev-panel-close').addEventListener('click', async () =>
   $devPanel.classList.remove('visible');
   document.getElementById('settings-dev-mode').checked = false;
   await window.electronAPI.savePrefs({ developerMode: false });
+});
+
+document.getElementById('settings-dev-mode').addEventListener('change', async (e) => {
+  devPanelVisible = e.target.checked;
+  $devPanel.classList.toggle('visible', devPanelVisible);
+  await window.electronAPI.savePrefs({ developerMode: devPanelVisible });
 });
 
 function _getOrCreateModelRow(name) {

@@ -663,7 +663,7 @@ footer {
 <div id="page-download" class="page">
 
   <div class="dl-hero">
-    <div class="dl-eyebrow">v1.0.0 — Latest Release</div>
+    <div class="dl-eyebrow" id="dl-eyebrow">v1.1.0 — Latest Release</div>
     <h1 class="dl-h">DOWN<br><span class="a">LOAD.</span></h1>
     <p class="dl-sub">Free, open source, self-hosted. Everything is bundled — Python, Whisper, and all dependencies included. No install step.</p>
   </div>
@@ -674,10 +674,10 @@ footer {
         <div class="dl-card-badge">● Available Now</div>
         <i class="ph-bold ph-windows-logo dl-win-icon"></i>
         <div class="dl-platform-name">Windows</div>
-        <div class="dl-version">v1.0.0 &nbsp;·&nbsp; Windows 10 / 11 &nbsp;·&nbsp; 64-bit</div>
+        <div class="dl-version" id="dl-version">v1.1.0 &nbsp;·&nbsp; Windows 10 / 11 &nbsp;·&nbsp; 64-bit</div>
       </div>
       <div class="dl-card-right">
-        <a class="btn-download" href="https://github.com/JustinSu11/charles/releases/latest/download/Charles.Setup.1.0.0.exe" target="_blank">↓ Download Charles.exe</a>
+        <a class="btn-download" id="btn-download" href="https://github.com/JustinSu11/charles/releases" target="_blank">↓ Download Charles.exe</a>
         <div class="dl-size-note">
           ~1.5GB — includes bundled Python 3.11,<br>
           Whisper base model, and all dependencies.<br>
@@ -795,6 +795,36 @@ function showPage(name) {
       rafId = requestAnimationFrame(frame);
     }
   });
+})();
+
+// ── Dynamic latest-release download link ─────────────────────────────────────
+// Fetches the latest GitHub release and updates the download button href and
+// version labels so they never go stale when a new version ships.
+// Falls back gracefully to the releases page if the API call fails.
+(async function () {
+  try {
+    const res = await fetch('https://api.github.com/repos/JustinSu11/charles/releases/latest');
+    if (!res.ok) return;
+    const data = await res.json();
+
+    const version = (data.tag_name || '').replace(/^v/, '');
+    const exeAsset = (data.assets || []).find(function(a) { return a.name.endsWith('.exe'); });
+
+    if (exeAsset) {
+      const btn = document.getElementById('btn-download');
+      if (btn) btn.href = exeAsset.browser_download_url;
+    }
+
+    if (version) {
+      const eyebrow = document.getElementById('dl-eyebrow');
+      if (eyebrow) eyebrow.textContent = 'v' + version + ' \u2014 Latest Release';
+
+      const dlVer = document.getElementById('dl-version');
+      if (dlVer) dlVer.textContent = 'v' + version + '  \u00b7  Windows 10 / 11  \u00b7  64-bit';
+    }
+  } catch (_) {
+    // Network error — leave the fallback href (releases page) in place
+  }
 })();
 </script>
 

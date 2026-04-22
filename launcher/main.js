@@ -272,7 +272,7 @@ function registerIPC() {
   ipcMain.handle('minimize-window',  () => mainWindow?.minimize())
   ipcMain.handle('close-window',     () => mainWindow?.close())
   ipcMain.handle('quit-app',         () => { app.isQuiting = true; stopAll(); app.quit() })
-  ipcMain.handle('install-update',   () => { stopAll(); autoUpdater.quitAndInstall() })
+  ipcMain.handle('install-update',   () => { app.isQuiting = true; stopAll(); autoUpdater.quitAndInstall() })
 
   // In the packaged app, resources/ is read-only — store .env in userData instead.
   const envPath = path.join(app.getPath('userData'), '.env')
