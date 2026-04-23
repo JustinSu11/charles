@@ -24,7 +24,16 @@
   --text-dim:    rgba(254,243,199,0.35);
   --font-d:      'Bebas Neue', sans-serif;
   --font-b:      'Space Mono', monospace;
+
+  /* Layout — scale up on wider viewports */
+  --content-max: 1440px;
+  --page-pad:    clamp(24px, 3.5vw, 80px);
 }
+
+/* ── Ultrawide breakpoints ── */
+@media (min-width: 1920px) { :root { --content-max: 1680px; } }
+@media (min-width: 2560px) { :root { --content-max: 1920px; } }
+@media (min-width: 3200px) { :root { --content-max: 2200px; } }
 
 /* ─────────────── Reset ─────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -52,8 +61,14 @@ nav {
   backdrop-filter: blur(20px) saturate(150%);
   border-bottom: 1px solid rgba(254,243,199,0.12);
   height: 56px;
+}
+.nav-inner {
+  max-width: var(--content-max);
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 var(--page-pad);
+  height: 100%;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 48px;
 }
 .nav-logo {
   font-family: var(--font-d);
@@ -116,8 +131,8 @@ nav {
   display: flex; align-items: center;
 }
 .hero-inner {
-  max-width: 1280px; width:100%;
-  margin: 0 auto; padding: 80px 48px 60px;
+  max-width: var(--content-max); width:100%;
+  margin: 0 auto; padding: 80px var(--page-pad) 60px;
   display: grid; grid-template-columns: 1fr 420px;
   gap: 60px; align-items: center;
 }
@@ -199,7 +214,7 @@ nav {
 .gif-live-text { color: #22c55e; }
 
 /* ─────────────── LANDING — Features ─────────────── */
-.features { padding: 100px 48px; max-width: 1280px; margin: 0 auto; }
+.features { padding: 100px var(--page-pad); max-width: var(--content-max); margin: 0 auto; }
 .sec-header {
   display: flex; align-items:baseline; gap:20px;
   padding-bottom: 20px; border-bottom: 1px solid var(--border); margin-bottom: 48px;
@@ -273,7 +288,7 @@ nav {
   border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
   padding: 80px 0;
 }
-.how-inner { max-width: 1280px; margin: 0 auto; padding: 0 48px; }
+.how-inner { max-width: var(--content-max); margin: 0 auto; padding: 0 var(--page-pad); }
 .how-grid { display: grid; grid-template-columns: repeat(3,1fr); margin-top: 48px; }
 .how-step { padding: 0 48px 0 0; margin-right: 48px; border-right: 1px solid var(--border); }
 .how-step:last-child { border-right:none; padding-right:0; margin-right:0; }
@@ -290,7 +305,7 @@ nav {
 
 /* ─────────────── LANDING — CTA Strip ─────────────── */
 .cta-strip {
-  padding: 80px 48px; max-width: 1280px; margin:0 auto;
+  padding: 80px var(--page-pad); max-width: var(--content-max); margin:0 auto;
   display: flex; align-items:center; justify-content:space-between; gap:40px;
 }
 .cta-strip-h { font-family: var(--font-d); font-size: 60px; line-height:0.9; margin-bottom: 12px; }
@@ -299,7 +314,12 @@ nav {
 
 /* ─────────────── Footer ─────────────── */
 footer {
-  border-top: 1px solid var(--border); padding: 24px 48px;
+  border-top: 1px solid var(--border);
+}
+.foot-inner {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 24px var(--page-pad);
   display:flex; justify-content:space-between; align-items:center;
 }
 .foot-text { font-size:10px; color: var(--text-dim); }
@@ -314,8 +334,8 @@ footer {
 
 /* ─────────────── DOWNLOAD PAGE ─────────────── */
 .dl-hero {
-  padding: 140px 48px 60px;
-  max-width: 1280px; margin:0 auto;
+  padding: 140px var(--page-pad) 60px;
+  max-width: var(--content-max); margin:0 auto;
   border-bottom: 1px solid var(--border);
 }
 .dl-eyebrow {
@@ -334,7 +354,11 @@ footer {
 .dl-sub { font-size:12px; color:var(--text-muted); max-width:400px; line-height:1.75; }
 
 /* ── Windows card ── */
-.dl-card-wrap { max-width: 1280px; margin: 0 48px; border: 1px solid var(--border); border-top: none; }
+.dl-card-wrap {
+  width: min(var(--content-max), calc(100% - var(--page-pad) * 2));
+  margin: 0 auto;
+  border: 1px solid var(--border); border-top: none;
+}
 .dl-card {
   padding: 48px;
   background: #7e2e13;
@@ -376,7 +400,8 @@ footer {
 /* ── Requirements + Steps ── */
 .dl-lower {
   display: grid; grid-template-columns:1fr 1fr;
-  max-width:1280px; margin:0 48px;
+  width: min(var(--content-max), calc(100% - var(--page-pad) * 2));
+  margin: 0 auto;
   border: 1px solid var(--border); border-top:none;
   background: #5c1e0e;
 }
@@ -407,7 +432,8 @@ footer {
 .step-body p { font-size:10px; color:var(--text-muted); line-height:1.65; }
 
 .api-note {
-  max-width:1280px; margin:0 48px 60px;
+  width: min(var(--content-max), calc(100% - var(--page-pad) * 2));
+  margin: 0 auto 60px;
   padding:16px 20px;
   background:#7e2e13; border:none;
   box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 8px 32px rgba(0,0,0,0.4);
@@ -419,7 +445,7 @@ footer {
 
 /* ─────────────── Mobile ─────────────── */
 @media (max-width: 768px) {
-  nav { padding: 0 20px; }
+  .nav-inner { padding: 0 20px; }
   .nav-link { display: none; }
 
   .hero-inner {
@@ -436,9 +462,8 @@ footer {
   .hero-ctas .btn-ghost { width: 100%; text-align: center; justify-content: center; }
   .hero-tags { gap: 12px; }
 
-  .sec-inner { padding: 60px 20px; }
+  .features { padding: 60px 20px; }
   .sec-title { font-size: 32px; }
-  .sec-right { font-size: 12px; margin-top: 8px; }
 
   .feat-grid { grid-template-columns: 1fr 1fr; }
   .feat-card:nth-child(3n)  { border-right: 1px solid var(--border); }
@@ -446,6 +471,7 @@ footer {
   .feat-card:nth-child(n+5) { border-bottom: none; }
   .feat-card:nth-child(n+4) { border-bottom: 1px solid var(--border); }
 
+  .how-inner { padding: 0 20px; }
   .how-grid { grid-template-columns: 1fr; margin-top: 32px; }
   .how-step {
     border-right: none;
@@ -462,27 +488,29 @@ footer {
   .cta-strip-btns .btn-primary,
   .cta-strip-btns .btn-ghost { width: 100%; text-align: center; }
 
-  footer { padding: 20px; flex-direction: column; gap: 16px; text-align: center; }
+  .foot-inner { padding: 20px; flex-direction: column; gap: 16px; text-align: center; }
   .foot-links { gap: 20px; flex-wrap: wrap; justify-content: center; }
 
   /* Download page */
-  .dl-inner { padding: 60px 20px 40px; }
+  .dl-hero { padding: 60px 20px 40px; }
   .dl-h { font-size: clamp(52px, 16vw, 90px); }
   .dl-card { grid-template-columns: 1fr; gap: 24px; padding: 28px 20px; }
   .dl-card-right { align-items: flex-start; min-width: unset; }
   .btn-download { width: 100%; text-align: center; }
   .dl-platform-name { font-size: 36px; }
-  .dl-lower { grid-template-columns: 1fr; margin: 0 20px; }
+  .dl-lower { grid-template-columns: 1fr; width: calc(100% - 40px); }
   .dl-col:first-child { border-right: none; border-bottom: 1px solid var(--border); }
+  .dl-card-wrap { width: calc(100% - 40px); }
+  .api-note { width: calc(100% - 40px); }
 }
 
 @media (max-width: 480px) {
-  nav { padding: 0 16px; }
+  .nav-inner { padding: 0 16px; }
 
   .hero-inner { padding: 56px 16px 36px; }
   .hero-title { font-size: clamp(56px, 20vw, 90px); }
 
-  .sec-inner { padding: 48px 16px; }
+  .features { padding: 48px 16px; }
   .feat-grid { grid-template-columns: 1fr; }
   .feat-card:nth-child(2n)  { border-right: none; }
   .feat-card:nth-child(n+4) { border-bottom: none; }
@@ -490,11 +518,13 @@ footer {
   .feat-card:not(:last-child) { border-bottom: 1px solid var(--border); }
 
   .cta-strip { padding: 36px 16px; }
-  footer { padding: 16px; }
+  .foot-inner { padding: 16px; }
 
-  .dl-inner { padding: 48px 16px 32px; }
+  .dl-hero { padding: 48px 16px 32px; }
   .dl-card { padding: 24px 16px; }
-  .dl-lower { margin: 0 16px; }
+  .dl-lower { width: calc(100% - 32px); }
+  .dl-card-wrap { width: calc(100% - 32px); }
+  .api-note { width: calc(100% - 32px); }
   .dl-col { padding: 28px 16px; }
 }
 </style>
@@ -503,11 +533,13 @@ footer {
 
 <!-- ══════════════════ NAV ══════════════════ -->
 <nav>
-  <button class="nav-logo" onclick="showPage('landing')">charles<span>.</span></button>
-  <div class="nav-right">
-    <a class="nav-link" href="https://github.com/JustinSu11/charles" target="_blank">GitHub</a>
-    <a class="nav-link" href="https://github.com/JustinSu11/charles#readme" target="_blank">Docs</a>
-    <button class="nav-cta" onclick="showPage('download')">↓ Download</button>
+  <div class="nav-inner">
+    <button class="nav-logo" onclick="showPage('landing')">charles<span>.</span></button>
+    <div class="nav-right">
+      <a class="nav-link" href="https://github.com/JustinSu11/charles" target="_blank">GitHub</a>
+      <a class="nav-link" href="https://github.com/JustinSu11/charles#readme" target="_blank">Docs</a>
+      <button class="nav-cta" onclick="showPage('download')">↓ Download</button>
+    </div>
   </div>
 </nav>
 
@@ -648,12 +680,14 @@ footer {
   </div>
 
   <footer>
-    <div class="foot-text">© 2026 Charles. MIT License.</div>
-    <div class="foot-links">
-      <button class="foot-link" onclick="showPage('download')">Download</button>
-      <a class="foot-link" href="https://github.com/JustinSu11/charles" target="_blank">GitHub</a>
-      <a class="foot-link" href="https://github.com/JustinSu11/charles/releases" target="_blank">Releases</a>
-      <a class="foot-link" href="https://github.com/JustinSu11/charles#readme" target="_blank">Docs</a>
+    <div class="foot-inner">
+      <div class="foot-text">© 2026 Charles. MIT License.</div>
+      <div class="foot-links">
+        <button class="foot-link" onclick="showPage('download')">Download</button>
+        <a class="foot-link" href="https://github.com/JustinSu11/charles" target="_blank">GitHub</a>
+        <a class="foot-link" href="https://github.com/JustinSu11/charles/releases" target="_blank">Releases</a>
+        <a class="foot-link" href="https://github.com/JustinSu11/charles#readme" target="_blank">Docs</a>
+      </div>
     </div>
   </footer>
 </div>
@@ -736,12 +770,14 @@ footer {
   </div>
 
   <footer>
-    <div class="foot-text">© 2026 Charles. MIT License.</div>
-    <div class="foot-links">
-      <button class="foot-link" onclick="showPage('landing')">Home</button>
-      <a class="foot-link" href="https://github.com/JustinSu11/charles" target="_blank">GitHub</a>
-      <a class="foot-link" href="https://github.com/JustinSu11/charles/releases" target="_blank">Releases</a>
-      <a class="foot-link" href="https://github.com/JustinSu11/charles#readme" target="_blank">Docs</a>
+    <div class="foot-inner">
+      <div class="foot-text">© 2026 Charles. MIT License.</div>
+      <div class="foot-links">
+        <button class="foot-link" onclick="showPage('landing')">Home</button>
+        <a class="foot-link" href="https://github.com/JustinSu11/charles" target="_blank">GitHub</a>
+        <a class="foot-link" href="https://github.com/JustinSu11/charles/releases" target="_blank">Releases</a>
+        <a class="foot-link" href="https://github.com/JustinSu11/charles#readme" target="_blank">Docs</a>
+      </div>
     </div>
   </footer>
 </div>
